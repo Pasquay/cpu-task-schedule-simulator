@@ -68,6 +68,10 @@ h3{margin:0;font-size:22px;font-weight:800}
 .quantum .num{width:84px}
 .note{min-height:20px;font-size:13px;color:var(--error)}
 .note.info{color:var(--muted)}
+.algoname{font-weight:600;color:var(--muted)}
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.exl{align-self:center;padding:0 8px 0 14px}
+#exportRow .tab{height:40px;padding:0 16px;font-size:14px}
 .edge{display:flex;flex-direction:column;gap:6px}
 .edge button{display:flex;align-items:center;gap:10px;height:40px;padding:0 16px 0 6px;border:0;border-radius:999px;background:var(--tray);font:600 14px var(--text);text-align:left;transition:background .2s var(--ease),color .2s var(--ease)}
 .edge button:hover:not(.on){background:#D6DCCE}
@@ -202,7 +206,7 @@ td .token{padding:6px 14px}
         <path id="grainBlob" fill="#2B2B2E" filter="url(#grainF)"/>
       </svg>
       <div class="stagehead">
-        <h2>Stage</h2>
+        <h2>Stage <span class="algoname" id="algoName"></span></h2>
         <div class="tread"><b id="tRead">0</b><span>time t</span></div>
       </div>
       <div class="zones">
@@ -246,7 +250,16 @@ td .token{padding:6px 14px}
 </div>
 
 <section id="metricsView" class="mview">
-  <h2>Metrics</h2>
+  <div class="mhead">
+    <h2>Metrics</h2>
+    <div class="seg" id="exportRow" role="group" aria-label="Export results">
+      <span class="lbl exl">Export</span>
+      <button class="tab" data-x="csv">CSV</button>
+      <button class="tab" data-x="pdf">PDF</button>
+      <button class="tab" data-x="png">PNG</button>
+      <button class="tab" data-x="jpg">JPG</button>
+    </div>
+  </div>
   <div class="mrow">
     <div class="dark" id="dark"></div>
     <div class="tcard"><table id="mtable"></table></div>
@@ -284,8 +297,8 @@ function simulate(procs, algo, quantum, preemptive){
   var queue = [], cur = -1, qUsed = 0, doneCount = 0, t = 0;
   function cmp(a, b){ for (var j = 0; j < a.length; j++){ if (a[j] < b[j]) return -1; if (a[j] > b[j]) return 1; } return 0; }
   function key(j){
-    if (algo === 'SJF') return [burst[j], arrival[j], j];
-    if (algo === 'SRTF') return [rem[j], arrival[j], j];
+    if (algo === 'SJF' && preemptive === false) return [burst[j], arrival[j], j];
+    if (algo === 'SRTF' || (algo === 'SJF' && preemptive !== false)) return [rem[j], arrival[j], j];
     if (algo === 'Priority') return [pri[j], arrival[j], j];
     return [arrival[j], j];
   }
@@ -298,14 +311,14 @@ function simulate(procs, algo, quantum, preemptive){
     if (algo === 'RR'){
       if (cur !== -1 && qUsed < quantum) next = cur;
       else if (queue.length) next = queue.shift();
-    } else if (algo === 'FCFS' || algo === 'SJF' || (algo === 'Priority' && preemptive === false)){
+    } else if (algo === 'FCFS' || preemptive === false){
       if (cur !== -1) next = cur;
       else { list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0]; }
     } else {
       list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0];
     }
-    /* tie on remaining time (SRTF) or priority (preemptive Priority): the running task keeps the CPU */
-    if ((algo === 'SRTF' || (algo === 'Priority' && preemptive !== false)) && cur !== -1 && next !== cur && key(cur)[0] === key(next)[0]) next = cur;
+    /* preemptive SJF/SRTF/Priority: on a tie in remaining time or priority, the running task keeps the CPU */
+    if ((algo === 'SJF' || algo === 'SRTF' || algo === 'Priority') && preemptive !== false && cur !== -1 && next !== cur && key(cur)[0] === key(next)[0]) next = cur;
     var ready;
     if (algo === 'RR') ready = queue.slice();
     else { ready = cands().filter(function(x){ return x !== next; }); ready.sort(function(a, b){ return cmp(key(a), key(b)); }); }
@@ -374,16 +387,18 @@ var PRESETS = [
    why: 'nothing has arrived during 0\u20132 and 7\u20139, so the CPU sits idle.'},
   {name: 'Arrival tie', algo: 'FCFS', rows: [[0,4,1],[0,2,1],[0,3,1]],
    why: 'A, B and C all arrive at t = 0, so they run in task order: A, B, C.'},
-  {name: 'Burst tie', algo: 'SJF', rows: [[0,3,1],[2,2,1],[1,2,1],[1,2,1]],
+  {name: 'Burst tie', algo: 'SJF', preempt: false, rows: [[0,3,1],[2,2,1],[1,2,1],[1,2,1]],
    why: 'B, C and D all have burst 2. Earlier arrival wins (C, D before B), then task order (C before D).'},
   {name: 'Priority tie', algo: 'Priority', preempt: false, rows: [[0,4,3],[1,3,1],[2,2,1],[1,1,2]],
    why: 'lower number = higher priority. B and C share priority 1, so earlier arrival (B) goes first.'},
-  {name: 'SRTF tie', algo: 'SRTF', rows: [[0,5,1],[2,3,1],[4,1,1]],
+  {name: 'SRTF tie', algo: 'SRTF', preempt: true, rows: [[0,5,1],[2,3,1],[4,1,1]],
    why: 'B arrives at t = 2 needing 3, the same as A has left, so A keeps the CPU. Same when C arrives at t = 4.'}
 ];
 function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arrival: r[0], burst: r[1], priority: r[2]}; }); }
 
-var S = {algo:'SRTF', quantum:2, preempt:true, procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
+var FULL = {FCFS: 'First Come First Serve', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling'};
+function defaultPre(){ return {FCFS: false, SJF: false, SRTF: true, RR: true, Priority: true}; }
+var S = {algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
 
 function $(id){ return document.getElementById(id); }
 function h(tag, attrs){
@@ -411,12 +426,12 @@ function fmt(n){ return (Math.round(n * 100) / 100).toFixed(2); }
 function tokenStyle(i){ return 'background:' + COL[i] + ';color:' + INK[i] + ';border-radius:' + SHAPE[i]; }
 
 /* ---------- history ---------- */
-function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt}; }
+function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt, pre: Object.assign({}, S.pre)}; }
 function pushUndo(){ S.preset = -1; S.undo.push(snapshot()); if (S.undo.length > 40) S.undo.shift(); $('undo').disabled = false; }
 function undo(){
   var s = S.undo.pop();
   if (!s){ say('Nothing to undo.'); return; }
-  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt;
+  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt; S.pre = s.pre;
   $('undo').disabled = !S.undo.length;
   say('Undone.'); buildAll();
 }
@@ -486,12 +501,14 @@ function buildTabs(){
       pushUndo(); S.algo = a; say(''); buildAll();
     }}, a));
   });
-  $('preRow').hidden = S.algo !== 'RR' && S.algo !== 'Priority';
+  S.preempt = S.pre[S.algo];
+  $('algoName').textContent = '(' + FULL[S.algo] + ')';
+  $('preRow').hidden = S.algo === 'FCFS' || S.algo === 'RR';
   Array.prototype.forEach.call($('preRow').children, function(b){
     var on = (b.dataset.p === '1') === S.preempt;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   });
-  $('qRow').hidden = S.algo !== 'RR' || !S.preempt;
+  $('qRow').hidden = S.algo !== 'RR';
   $('quantum').value = S.quantum;
 }
 function buildWorkload(){
@@ -549,7 +566,7 @@ Array.prototype.forEach.call($('preRow').children, function(b){
   b.addEventListener('click', function(){
     var p = b.dataset.p === '1';
     if (p === S.preempt) return;
-    pushUndo(); S.preempt = p; say(''); buildTabs(); recompute();
+    pushUndo(); S.preempt = S.pre[S.algo] = p; say(''); buildTabs(); recompute();
   });
 });
 $('quantum').addEventListener('input', function(){ markBad(this, false); });
@@ -571,7 +588,7 @@ function loadEdge(k){
   pushUndo(); setPlaying(false);
   S.preset = k;
   S.procs = mk(p.rows); S.algo = p.algo;
-  if (p.preempt !== undefined) S.preempt = p.preempt;
+  if (p.preempt !== undefined) S.pre[p.algo] = p.preempt;
   S.t = 0; buildAll();
   say('Edge case ' + (k + 1) + ', ' + p.name + ' (' + p.algo + (p.preempt === false ? ', non-preemptive' : '') + '): ' + p.why, true);
 }
@@ -586,7 +603,7 @@ function markEdge(){
   });
 }
 $('reset').addEventListener('click', function(){
-  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.preempt = true; S.preset = -1; say(''); buildAll();
+  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.pre = defaultPre(); S.preset = -1; say(''); buildAll();
 });
 $('undo').addEventListener('click', undo);
 
@@ -666,9 +683,9 @@ function buildMetrics(){
 
 /* ---------- compare ---------- */
 function buildCompare(){
-  var res = ALGOS.map(function(a){ return {a: a, s: simulate(S.procs, a, S.quantum, S.preempt)}; });
+  var res = ALGOS.map(function(a){ return {a: a, s: simulate(S.procs, a, S.quantum, S.pre[a])}; });
   var T = Math.max.apply(null, res.map(function(r){ return r.s.total; }).concat([1]));
-  $('cmpCtx').textContent = S.procs.length + ' tasks' + (S.algo === 'Priority' ? ', priorities set' : '') + ', quantum ' + S.quantum + (S.preempt ? '' : ', RR and Priority non-preemptive');
+  $('cmpCtx').textContent = S.procs.length + ' tasks' + (S.algo === 'Priority' ? ', priorities set' : '') + ', quantum ' + S.quantum + '  \u00b7  preemptive: ' + ALGOS.filter(function(a){ return S.pre[a]; }).join(', ') + '  \u00b7  non-preemptive: ' + ALGOS.filter(function(a){ return !S.pre[a]; }).join(', ');
   rulerInto($('cRuler'), T);
   var strips = $('strips'); strips.replaceChildren();
   res.forEach(function(r){
@@ -925,6 +942,160 @@ Array.prototype.forEach.call($('viewTabs').children, function(b){
     $('cmpView').hidden = !cmpOn;
     if (cmpOn){ setPlaying(false); buildCompare(); } else { S.sig = ''; paint(true); }
   });
+});
+
+/* ---------- export ---------- */
+function fileBase(){ return 'SchedSim_' + S.algo + (S.algo !== 'FCFS' && S.algo !== 'RR' ? (S.preempt ? '_preemptive' : '_nonpreemptive') : ''); }
+function modeText(){
+  var t = S.algo;
+  if (S.algo !== 'FCFS' && S.algo !== 'RR') t += S.preempt ? ' (preemptive)' : ' (non-preemptive)';
+  if (S.algo === 'RR') t += ', quantum ' + S.quantum;
+  return t;
+}
+function download(blob, name){
+  var url = URL.createObjectURL(blob), a = h('a', {href: url, download: name});
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+function timeline(){
+  var s = S.sim;
+  return s.segments.map(function(g){ return {start: g.start, end: g.end, pid: g.pid}; })
+    .concat(s.idle.map(function(g){ return {start: g.start, end: g.end, pid: -1}; }))
+    .sort(function(a, b){ return a.start - b.start; });
+}
+function resultCols(){
+  var pri = S.algo === 'Priority';
+  var c = [['Task', function(m){ return m.id; }], ['Arrival (AT)', function(m){ return m.arrival; }], ['Burst (BT)', function(m){ return m.burst; }]];
+  if (pri) c.push(['Priority', function(m, k){ return S.procs[k].priority; }]);
+  c.push(['Completion (CT)', function(m){ return m.finish; }], ['Turnaround (TAT)', function(m){ return m.turnaround; }],
+    ['Waiting (WT)', function(m){ return m.waiting; }], ['Response (RT)', function(m){ return m.response; }]);
+  return c;
+}
+function avgRow(cols){
+  var a = S.sim.avg;
+  return cols.map(function(c, j){
+    if (j === 0) return 'Average';
+    if (c[0] === 'Turnaround (TAT)') return fmt(a.turnaround);
+    if (c[0] === 'Waiting (WT)') return fmt(a.waiting);
+    if (c[0] === 'Response (RT)') return fmt(a.response);
+    return '';
+  });
+}
+function exportCSV(){
+  var s = S.sim, cols = resultCols(), rows = [];
+  rows.push(['Algorithm', modeText()]);
+  rows.push([]);
+  rows.push(cols.map(function(c){ return c[0]; }));
+  s.metrics.forEach(function(m, k){ rows.push(cols.map(function(c){ return c[1](m, k); })); });
+  rows.push(avgRow(cols));
+  rows.push([]);
+  rows.push(['CPU utilization', Math.round(s.util * 100) + '%']);
+  rows.push(['Context switches', s.switches]);
+  rows.push(['Total time', s.total]);
+  rows.push([]);
+  rows.push(['Gantt chart']);
+  rows.push(['Start', 'End', 'Task']);
+  timeline().forEach(function(g){ rows.push([g.start, g.end, g.pid < 0 ? 'Idle' : S.procs[g.pid].id]); });
+  var csv = rows.map(function(r){ return r.map(function(v){ v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }).join('\r\n');
+  download(new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'}), fileBase() + '.csv');
+}
+var TXT = '"Bricolage Grotesque", "Segoe UI", Arial, sans-serif', MONO = '"Chivo Mono", Consolas, monospace';
+function reportCanvas(){
+  var s = S.sim, cols = resultCols(), n = s.metrics.length, T = Math.max(1, s.total);
+  var W = 1100, P = 56, SC = 2, ROW = 40, GH = 56;
+  var H = P + 34 + 28 + 44 + 22 + GH + 30 + 44 + 22 + 32 + (n + 1) * ROW + 36 + 24 + P;
+  var cv = document.createElement('canvas'); cv.width = W * SC; cv.height = H * SC;
+  var c = cv.getContext('2d'); c.scale(SC, SC);
+  c.fillStyle = '#FFFFFF'; c.fillRect(0, 0, W, H);
+  function txt(t, x, y, font, color, align){ c.font = font; c.fillStyle = color; c.textAlign = align || 'left'; c.textBaseline = 'middle'; c.fillText(String(t), x, y); }
+  function rr(x, y, w, hh, r){ c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, hh, r); else c.rect(x, y, w, hh); }
+  var y = P;
+  txt('CPU Scheduling Results', P, y + 14, '800 30px ' + TXT, '#18181B');
+  y += 34 + 14;
+  txt(modeText() + '  ·  ' + n + (n === 1 ? ' task' : ' tasks') + '  ·  ' + new Date().toLocaleString(), P, y, '400 14px ' + MONO, '#4E5259');
+  y += 44;
+  txt('Gantt chart', P, y, '600 15px ' + TXT, '#4E5259');
+  y += 22;
+  var gx = P, gw = W - 2 * P;
+  function X(t){ return gx + t / T * gw; }
+  timeline().forEach(function(g){
+    var x0 = X(g.start), x1 = X(g.end), w = x1 - x0;
+    c.fillStyle = g.pid < 0 ? '#EEF1EA' : COL[g.pid]; c.fillRect(x0, y, w, GH);
+    if (g.pid < 0){
+      c.save(); c.beginPath(); c.rect(x0, y, w, GH); c.clip(); c.strokeStyle = '#D6DCCE'; c.lineWidth = 2;
+      for (var hx = x0 - GH; hx < x1; hx += 10){ c.beginPath(); c.moveTo(hx, y + GH); c.lineTo(hx + GH, y); c.stroke(); }
+      c.restore();
+    }
+    c.fillStyle = '#FFFFFF'; c.fillRect(x1 - 1, y, 2, GH);
+    var label = g.pid < 0 ? 'idle' : S.procs[g.pid].id;
+    c.font = '600 15px ' + MONO;
+    if (c.measureText(label).width + 6 < w) txt(label, x0 + w / 2, y + GH / 2, '600 15px ' + MONO, g.pid < 0 ? '#4E5259' : INK[g.pid], 'center');
+  });
+  c.strokeStyle = '#18181B'; c.lineWidth = 1.5; c.strokeRect(gx, y, gw, GH);
+  var marks = [0]; timeline().forEach(function(g){ if (marks[marks.length - 1] !== g.start) marks.push(g.start); marks.push(g.end); });
+  var lastX = -99;
+  marks.forEach(function(t, k){
+    var x = X(t);
+    if (x - lastX < 24 && k !== marks.length - 1) return;
+    lastX = x;
+    c.fillStyle = '#18181B'; c.fillRect(x - .75, y + GH, 1.5, 6);
+    txt(t, x, y + GH + 18, '400 13px ' + MONO, '#18181B', 'center');
+  });
+  y += GH + 30 + 44;
+  txt('Results', P, y, '600 15px ' + TXT, '#4E5259');
+  y += 22;
+  var firstW = 130, rest = (W - 2 * P - firstW) / (cols.length - 1);
+  function colR(j){ return P + firstW + rest * j; }
+  cols.forEach(function(col, j){ txt(col[0], j ? colR(j) : P, y + 16, '600 13px ' + TXT, '#4E5259', j ? 'right' : 'left'); });
+  y += 32;
+  s.metrics.forEach(function(m, k){
+    c.fillStyle = '#DDE2D6'; c.fillRect(P, y, W - 2 * P, 1);
+    var cy = y + ROW / 2;
+    rr(P, cy - 13, 44, 26, 13); c.fillStyle = COL[k]; c.fill();
+    txt(m.id, P + 22, cy, '600 14px ' + MONO, INK[k], 'center');
+    cols.forEach(function(col, j){ if (j) txt(col[1](m, k), colR(j), cy, '400 16px ' + MONO, '#18181B', 'right'); });
+    y += ROW;
+  });
+  c.fillStyle = '#18181B'; c.fillRect(P, y, W - 2 * P, 1.5);
+  avgRow(cols).forEach(function(v, j){ if (v !== '') txt(v, j ? colR(j) : P, y + ROW / 2, '600 16px ' + (j ? MONO : TXT), '#18181B', j ? 'right' : 'left'); });
+  y += ROW + 36;
+  txt('CPU utilization ' + Math.round(s.util * 100) + '%     Context switches ' + s.switches + '     Total time ' + s.total,
+    P, y, '400 14px ' + MONO, '#4E5259');
+  return cv;
+}
+function pdfFromJpeg(jpeg, iw, ih){
+  var PW = 595.28, PH = 841.89, M = 36, k = Math.min((PW - 2 * M) / iw, (PH - 2 * M) / ih), w = iw * k, hh = ih * k;
+  var enc = new TextEncoder(), parts = [], offs = [], len = 0;
+  function add(x){ var b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; }
+  function obj(num, body){ offs[num] = len; add(num + ' 0 obj\n'); body(); add('\nendobj\n'); }
+  add('%PDF-1.4\n'); add(new Uint8Array([37, 226, 227, 207, 211, 10]));
+  var content = 'q ' + w.toFixed(2) + ' 0 0 ' + hh.toFixed(2) + ' ' + M + ' ' + (PH - M - hh).toFixed(2) + ' cm /Im0 Do Q';
+  obj(1, function(){ add('<< /Type /Catalog /Pages 2 0 R >>'); });
+  obj(2, function(){ add('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'); });
+  obj(3, function(){ add('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'); });
+  obj(4, function(){ add('<< /Type /XObject /Subtype /Image /Width ' + iw + ' /Height ' + ih + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpeg.length + ' >>\nstream\n'); add(jpeg); add('\nendstream'); });
+  obj(5, function(){ add('<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream'); });
+  var xref = len;
+  add('xref\n0 6\n0000000000 65535 f \n');
+  for (var i = 1; i <= 5; i++) add(('0000000000' + offs[i]).slice(-10) + ' 00000 n \n');
+  add('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+  return new Blob(parts, {type: 'application/pdf'});
+}
+function exportAs(kind){
+  if (kind === 'csv'){ exportCSV(); say('Exported ' + fileBase() + '.csv', true); return; }
+  var fonts = document.fonts ? Promise.all(['800 30px ' + TXT, '600 15px ' + TXT, '400 14px ' + MONO, '600 15px ' + MONO].map(function(f){ return document.fonts.load(f); })).catch(function(){}) : Promise.resolve();
+  fonts.then(function(){
+    var cv = reportCanvas(), name = fileBase() + '.' + kind;
+    if (kind === 'pdf'){
+      var bin = atob(cv.toDataURL('image/jpeg', 0.95).split(',')[1]), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      download(pdfFromJpeg(bytes, cv.width, cv.height), name);
+    } else cv.toBlob(function(b){ download(b, name); }, kind === 'jpg' ? 'image/jpeg' : 'image/png', 0.95);
+    say('Exported ' + name, true);
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll('#exportRow [data-x]'), function(b){
+  b.addEventListener('click', function(){ exportAs(b.dataset.x); });
 });
 
 function recompute(){

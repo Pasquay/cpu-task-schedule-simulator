@@ -216,8 +216,14 @@ td.aname small{display:block;margin-top:2px}
         <div class="seg mlqn" id="mlqN" role="group" aria-label="Number of queues"><button class="tab" data-n="2">2</button><button class="tab" data-n="3">3</button></div>
       </div>
       <div id="mlqRows" class="mlq"></div>
-      <span class="lbl">Preemption between queues</span>
     </div>
+    <div class="mlq" id="mlfqBox" hidden>
+      <div class="quantum"><span class="lbl">Queues (all start in Q1)</span>
+        <div class="seg mlqn" id="mlfqN" role="group" aria-label="Number of queues"><button class="tab" data-n="2">2</button><button class="tab" data-n="3">3</button></div>
+      </div>
+      <div id="mlfqRows" class="mlq"></div>
+    </div>
+    <span class="lbl" id="preLbl" hidden>Preemption between queues</span>
     <div class="seg pre" id="preRow" role="group" aria-label="Preemption" hidden>
       <button class="tab on" data-p="1" aria-pressed="true">Preemptive</button>
       <button class="tab" data-p="0" aria-pressed="false">Non-preemptive</button>
@@ -336,9 +342,14 @@ function simulate(procs, algo, quantum, preemptive, mlq){
   for (i = 0; i < n; i++){ finish.push(0); first.push(-1); isDone.push(false); }
   var ticks = [], snap = [];
   var queue = [], cur = -1, qUsed = 0, doneCount = 0, t = 0;
-  var isMLQ = algo === 'MLQ', nq = isMLQ ? mlq.algos.length : 0, fifo = [];
+  /* MLQ and MLFQ share this path; MLFQ (isFB) moves tasks between queues */
+  var isFB = algo === 'MLFQ', isMLQ = algo === 'MLQ' || isFB, nq = isMLQ ? mlq.algos.length : 0, fifo = [];
+  var aging = isFB ? (mlq.aging || 0) : 0, waitT = procs.map(function(){ return 0; });
   for (i = 0; i < nq; i++) fifo.push([]);
-  var qOf = procs.map(function(p){ return isMLQ ? Math.min(nq, Math.max(1, p.queue || 1)) - 1 : 0; });
+  /* MLQ: fixed queue from the task's Queue field; MLFQ: everyone starts in Q1 */
+  var qOf = procs.map(function(p){ return isFB ? 0 : isMLQ ? Math.min(nq, Math.max(1, p.queue || 1)) - 1 : 0; });
+  /* queues kept as an ordered line: RR queues, and every MLFQ queue (order = order of entering it) */
+  function usesFifo(q){ return isFB || mlq.algos[q] === 'RR'; }
   /* order inside one MLQ queue (RR queues use their own FIFO list instead) */
   function mkey(j){
     var a = mlq.algos[qOf[j]];
@@ -367,12 +378,13 @@ function simulate(procs, algo, quantum, preemptive, mlq){
       var tq = topQueue();
       /* a task waiting in a higher queue interrupts the running one (preemptive mode only) */
       if (cur !== -1 && preemptive !== false && tq < qOf[cur]){
-        if (mlq.algos[qOf[cur]] === 'RR') fifo[qOf[cur]].push(cur);
+        /* interrupted RR task goes to the back of its line; an MLFQ FCFS task keeps its place at the front */
+        if (usesFifo(qOf[cur])){ if (isFB && mlq.algos[qOf[cur]] !== 'RR') fifo[qOf[cur]].unshift(cur); else fifo[qOf[cur]].push(cur); }
         cur = -1; qUsed = 0;
       }
       if (cur !== -1) next = cur;
       else if (tq < nq){
-        if (mlq.algos[tq] === 'RR') next = fifo[tq].shift();
+        if (usesFifo(tq)) next = fifo[tq].shift();
         else { list = cands().filter(function(x){ return qOf[x] === tq; }); list.sort(function(a, b){ return cmp(mkey(a), mkey(b)); }); next = list[0]; }
       }
     } else if (algo === 'RR'){
@@ -391,11 +403,11 @@ function simulate(procs, algo, quantum, preemptive, mlq){
     else if (isMLQ){
       ready = [];
       for (var qi = 0; qi < nq; qi++){
-        if (mlq.algos[qi] === 'RR') ready = ready.concat(fifo[qi]);
+        if (usesFifo(qi)) ready = ready.concat(fifo[qi]);
         else { list = cands().filter(function(x){ return qOf[x] === qi && x !== next; }); list.sort(function(a, b){ return cmp(mkey(a), mkey(b)); }); ready = ready.concat(list); }
       }
     } else { ready = cands().filter(function(x){ return x !== next; }); ready.sort(function(a, b){ return cmp(key(a), key(b)); }); }
-    snap.push({run: next, ready: ready, rem: rem.slice()});
+    snap.push({run: next, ready: ready, rem: rem.slice(), lvl: isFB ? qOf.slice() : null});
     ticks.push(next);
     if (next === -1){ cur = -1; qUsed = 0; }
     else {
@@ -408,7 +420,23 @@ function simulate(procs, algo, quantum, preemptive, mlq){
     }
     t++;
     if (algo === 'RR'){ enqueueArrivals(); if (preempt) queue.push(next); }
-    else if (isMLQ){ enqueueArrivals(); if (preempt) fifo[qOf[next]].push(next); }
+    else if (isMLQ){
+      enqueueArrivals();
+      if (preempt){
+        /* MLFQ: used its whole quantum without finishing, so it drops one queue */
+        if (isFB && qOf[next] < nq - 1) qOf[next]++;
+        fifo[qOf[next]].push(next);
+      }
+      /* MLFQ aging: a task waiting `aging` ticks in a lower queue moves up one queue */
+      if (aging > 0) for (j = 0; j < n; j++){
+        if (isDone[j] || arrival[j] >= t || j === next){ waitT[j] = 0; continue; }
+        waitT[j]++;
+        if (qOf[j] > 0 && waitT[j] >= aging){
+          var ix = fifo[qOf[j]].indexOf(j); if (ix >= 0) fifo[qOf[j]].splice(ix, 1);
+          qOf[j]--; fifo[qOf[j]].push(j); waitT[j] = 0;
+        }
+      }
+    }
   }
   var total = ticks.length;
   snap.push({run: -1, ready: [], rem: rem.slice()});
@@ -450,13 +478,26 @@ function simulate(procs, algo, quantum, preemptive, mlq){
 <script>
 (function(){
 'use strict';
-var ALGOS = ['FCFS','SJF','SRTF','RR','Priority','HRRN','MLQ'];
+var ALGOS = ['FCFS','SJF','SRTF','RR','Priority','HRRN','MLQ','MLFQ'];
 var MLQ_ALGOS = ['FCFS', 'SJF', 'RR', 'Priority'];
 function defaultMlq(){ return {n: 2, algos: ['RR', 'FCFS', 'SJF'], q: [2, 4, 8]}; }
 function copyMlq(m){ return {n: m.n, algos: m.algos.slice(), q: m.q.slice()}; }
 function mlqCfg(){ return {algos: S.mlq.algos.slice(0, S.mlq.n), q: S.mlq.q.slice(0, S.mlq.n)}; }
 function mlqText(){ return mlqCfg().algos.map(function(a, i){ return 'Q' + (i + 1) + ' ' + a + (a === 'RR' ? ' q=' + S.mlq.q[i] : ''); }).join(', '); }
 function mlqUsesPri(){ return mlqCfg().algos.indexOf('Priority') >= 0; }
+/* MLFQ: every queue but the last is RR (that's what drives demotion); the last is FCFS or RR */
+function defaultMlfq(){ return {n: 3, q: [2, 4, 8], last: 'FCFS', aging: 0}; }
+function copyMlfq(m){ return {n: m.n, q: m.q.slice(), last: m.last, aging: m.aging}; }
+function mlfqCfg(){
+  var a = []; for (var i = 0; i < S.mlfq.n; i++) a.push(i < S.mlfq.n - 1 ? 'RR' : S.mlfq.last);
+  return {algos: a, q: S.mlfq.q.slice(0, S.mlfq.n), aging: S.mlfq.aging};
+}
+function mlfqText(){
+  var c = mlfqCfg();
+  return c.algos.map(function(a, i){ return 'Q' + (i + 1) + ' ' + a + (a === 'RR' ? ' q=' + c.q[i] : ''); }).join(', ') + (c.aging ? ', aging ' + c.aging : ', no aging');
+}
+function cfgFor(a){ return a === 'MLFQ' ? mlfqCfg() : mlqCfg(); }
+function isML(a){ return a === 'MLQ' || a === 'MLFQ'; }
 var MAXT = 10, LETTERS = 'ABCDEFGHIJ';
 var COL = ['#3F63F2','#FFC93C','#FF4F2E','#2B2B2E','#B9A8FF','#4FD1A5','#FF8FC8','#0E7C66','#A8E05F','#8B5E34'];
 var INK = ['#FFFFFF','#18181B','#18181B','#FFFFFF','#18181B','#18181B','#18181B','#FFFFFF','#18181B','#FFFFFF'];
@@ -477,13 +518,15 @@ var PRESETS = [
   {name: 'HRRN ratio', algo: 'HRRN', rows: [[0,3,1],[1,6,1],[2,4,1]],
    why: 'at t = 3, B\u2019s ratio is (2 + 6) / 6 = 1.33 and C\u2019s is (1 + 4) / 4 = 1.25, so B runs first even though C is shorter.'},
   {name: 'MLQ preemption', algo: 'MLQ', preempt: true, mlq: {n: 2, algos: ['RR', 'FCFS', 'SJF'], q: [2, 4, 8]}, rows: [[0,5,1,2],[2,3,1,1],[3,2,1,1]],
-   why: 'Q1 is RR (q = 2), Q2 is FCFS. A (Q2) starts alone, B arrives in Q1 at t = 2 and preempts it. Q1 runs B, C, B until it empties at t = 7, then A resumes.'}
+   why: 'Q1 is RR (q = 2), Q2 is FCFS. A (Q2) starts alone, B arrives in Q1 at t = 2 and preempts it. Q1 runs B, C, B until it empties at t = 7, then A resumes.'},
+  {name: 'MLFQ demotion', algo: 'MLFQ', preempt: true, mlfq: {n: 3, q: [2, 4, 8], last: 'FCFS', aging: 0}, rows: [[0,8,1],[1,2,1],[5,3,1]],
+   why: 'Q1 RR q=2, Q2 RR q=4, Q3 FCFS. A uses its whole Q1 quantum and drops to Q2. Short B finishes inside Q1. C arrives at t = 5 and preempts A, then also drops. A keeps using full quanta and ends in Q3.'}
 ];
 function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arrival: r[0], burst: r[1], priority: r[2], queue: r[3] || 1 + (i % 2)}; }); }
 
-var FULL = {FCFS: 'First Come First Serve', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling', HRRN: 'Highest Response Ratio Next', MLQ: 'Multilevel Queue'};
-function defaultPre(){ return {FCFS: false, SJF: false, SRTF: true, RR: true, Priority: true, HRRN: false, MLQ: true}; }
-var S = {algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), mlq: defaultMlq(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
+var FULL = {FCFS: 'First Come First Serve', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling', HRRN: 'Highest Response Ratio Next', MLQ: 'Multilevel Queue', MLFQ: 'Multilevel Feedback Queue'};
+function defaultPre(){ return {FCFS: false, SJF: false, SRTF: true, RR: true, Priority: true, HRRN: false, MLQ: true, MLFQ: true}; }
+var S = {algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), mlq: defaultMlq(), mlfq: defaultMlfq(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
 
 function $(id){ return document.getElementById(id); }
 function h(tag, attrs){
@@ -511,12 +554,12 @@ function fmt(n){ return (Math.round(n * 100) / 100).toFixed(2); }
 function tokenStyle(i){ return 'background:' + COL[i] + ';color:' + INK[i] + ';border-radius:' + SHAPE[i]; }
 
 /* ---------- history ---------- */
-function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt, pre: Object.assign({}, S.pre), mlq: copyMlq(S.mlq)}; }
+function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt, pre: Object.assign({}, S.pre), mlq: copyMlq(S.mlq), mlfq: copyMlfq(S.mlfq)}; }
 function pushUndo(){ S.preset = -1; S.undo.push(snapshot()); if (S.undo.length > 40) S.undo.shift(); $('undo').disabled = false; }
 function undo(){
   var s = S.undo.pop();
   if (!s){ say('Nothing to undo.'); return; }
-  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt; S.pre = s.pre; S.mlq = s.mlq;
+  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt; S.pre = s.pre; S.mlq = s.mlq; S.mlfq = s.mlfq;
   $('undo').disabled = !S.undo.length;
   say('Undone.'); buildAll();
 }
@@ -589,7 +632,8 @@ function buildTabs(){
   S.preempt = S.pre[S.algo];
   $('algoName').textContent = '(' + FULL[S.algo] + ')';
   $('preRow').hidden = S.algo === 'FCFS' || S.algo === 'RR' || S.algo === 'HRRN';
-  buildMlq();
+  buildMlq(); buildMlfq();
+  $('preLbl').hidden = !isML(S.algo);
   Array.prototype.forEach.call($('preRow').children, function(b){
     var on = (b.dataset.p === '1') === S.preempt;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
@@ -625,6 +669,39 @@ Array.prototype.forEach.call($('mlqN').children, function(b){
     pushUndo(); S.mlq.n = n;
     S.procs.forEach(function(p){ if (p.queue > n) p.queue = n; });
     say(''); buildAll();
+  });
+});
+/* MLFQ sidebar: number of queues, quantum per RR queue, last queue FCFS/RR, aging */
+function qInput(label, val, lo, hi, set){
+  return h('input', {class: 'num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: val, 'aria-label': label,
+    oninput: function(){ markBad(this, false); },
+    onchange: function(){
+      var r = checkNum(this.value, label, lo, hi);
+      if (r.err){ markBad(this, true); say(r.err + ' Still using ' + val + '.'); return; }
+      markBad(this, false); this.value = r.v; say('');
+      if (r.v === val) return;
+      pushUndo(); set(r.v); val = r.v; recompute();
+    }});
+}
+function buildMlfq(){
+  var box = $('mlfqBox'); box.hidden = S.algo !== 'MLFQ';
+  if (box.hidden) return;
+  Array.prototype.forEach.call($('mlfqN').children, function(b){ var on = +b.dataset.n === S.mlfq.n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  var rows = $('mlfqRows'); rows.replaceChildren();
+  for (var qi = 0; qi < S.mlfq.n; qi++) (function(qi){
+    var last = qi === S.mlfq.n - 1, a = last ? S.mlfq.last : 'RR', algoEl;
+    if (last) algoEl = h('select', {class: 'num', 'aria-label': 'Algorithm for the last queue', onchange: function(){ pushUndo(); S.mlfq.last = this.value; say(''); buildAll(); }},
+      ['FCFS', 'RR'].map(function(x){ var o = h('option', {value: x}, x); if (x === a) o.selected = true; return o; }));
+    else algoEl = h('span', {class: 'num', style: 'display:flex;align-items:center;justify-content:center;font:600 15px var(--text)'}, 'RR');
+    var qin = a === 'RR' ? qInput('Quantum for Q' + (qi + 1), S.mlfq.q[qi], 1, 9, function(v){ S.mlfq.q[qi] = v; }) : h('span');
+    rows.appendChild(h('div', {class: 'mlqrow'}, h('span', {class: 'lbl'}, 'Q' + (qi + 1), h('small', null, qi === 0 ? 'highest' : last ? 'lowest' : '')), algoEl, qin));
+  })(qi);
+  rows.appendChild(h('div', {class: 'quantum'}, h('span', {class: 'lbl'}, 'Aging (ticks, 0 = off)'), qInput('Aging', S.mlfq.aging, 0, 99, function(v){ S.mlfq.aging = v; })));
+}
+Array.prototype.forEach.call($('mlfqN').children, function(b){
+  b.addEventListener('click', function(){
+    var n = +b.dataset.n; if (n === S.mlfq.n) return;
+    pushUndo(); S.mlfq.n = n; say(''); buildAll();
   });
 });
 function buildWorkload(){
@@ -709,6 +786,7 @@ function loadEdge(k){
   S.procs = mk(p.rows); S.algo = p.algo;
   if (p.preempt !== undefined) S.pre[p.algo] = p.preempt;
   if (p.mlq) S.mlq = copyMlq(p.mlq);
+  if (p.mlfq) S.mlfq = copyMlfq(p.mlfq);
   S.t = 0; buildAll();
   say('Edge case ' + (k + 1) + ', ' + p.name + ' (' + p.algo + (p.preempt === false ? ', non-preemptive' : '') + '): ' + p.why, true);
 }
@@ -723,7 +801,7 @@ function markEdge(){
   });
 }
 $('reset').addEventListener('click', function(){
-  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.pre = defaultPre(); S.mlq = defaultMlq(); S.preset = -1; say(''); buildAll();
+  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.pre = defaultPre(); S.mlq = defaultMlq(); S.mlfq = defaultMlfq(); S.preset = -1; say(''); buildAll();
 });
 $('undo').addEventListener('click', undo);
 
@@ -809,13 +887,13 @@ function compareRuns(){
   ALGOS.forEach(function(a){
     if (a === 'SJF' || a === 'Priority'){ v.push([a, false]); v.push([a, true]); }
     else if (a === 'SRTF'){ v.push([a, true]); v.push([a, false]); }
-    else if (a === 'MLQ'){ v.push([a, true]); v.push([a, false]); }
+    else if (isML(a)){ v.push([a, true]); v.push([a, false]); }
     else v.push([a, a === 'RR']);
   });
   return v.map(function(x){
-    var a = x[0], pre = x[1], both = a === 'SJF' || a === 'SRTF' || a === 'Priority' || a === 'MLQ';
+    var a = x[0], pre = x[1], both = a === 'SJF' || a === 'SRTF' || a === 'Priority' || isML(a);
     var mode = both ? (pre ? 'preemptive' : 'non-preemptive') : a === 'RR' ? 'quantum ' + S.quantum : 'non-preemptive';
-    return {a: a, pre: pre, mode: mode, s: simulate(S.procs, a, S.quantum, pre, mlqCfg())};
+    return {a: a, pre: pre, mode: mode, s: simulate(S.procs, a, S.quantum, pre, cfgFor(a))};
   });
 }
 var CMP_COLS = [['turnaround', 'Avg turnaround', -1], ['waiting', 'Avg waiting', -1], ['response', 'Avg response', -1], ['util', 'CPU busy', 1], ['switches', 'Switches', -1]];
@@ -826,7 +904,7 @@ function cmpBest(res){
   CMP_COLS.forEach(function(c){ var vs = res.map(function(r){ return cmpVal(r, c[0]); }); best[c[0]] = c[2] > 0 ? Math.max.apply(null, vs) : Math.min.apply(null, vs); });
   return best;
 }
-function cmpCtxText(){ return S.procs.length + (S.procs.length === 1 ? ' task' : ' tasks') + ', RR quantum ' + S.quantum + ', MLQ ' + mlqText(); }
+function cmpCtxText(){ return S.procs.length + (S.procs.length === 1 ? ' task' : ' tasks') + ', RR quantum ' + S.quantum + ', MLQ ' + mlqText() + ', MLFQ ' + mlfqText(); }
 function buildCompare(){
   var res = compareRuns();
   var T = Math.max.apply(null, res.map(function(r){ return r.s.total; }).concat([1]));
@@ -960,9 +1038,9 @@ function render(instant){
   });
   if (S.run >= 0) old[S.run] = cookieRect;
 
-  var rt = $('ready'), dt = $('done'), lanesOn = S.algo === 'MLQ';
+  var rt = $('ready'), dt = $('done'), lanesOn = isML(S.algo);
   Array.prototype.slice.call(document.querySelectorAll('#readyZone .token, #done .token')).forEach(function(el){ el.remove(); });
-  sn.ready.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = readyText(i, sn, k); (lanesOn ? $('qtray' + laneOf(i)) : rt).appendChild(el); });
+  sn.ready.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = readyText(i, sn, k); (lanesOn ? $('qtray' + laneOf(i, sn)) : rt).appendChild(el); });
   if (lanesOn) laneState(sn);
   sn.done.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = 'at ' + S.sim.metrics[i].finish; dt.appendChild(el); });
   rt.firstChild.hidden = false;
@@ -1020,25 +1098,29 @@ function cpuView(sn, run, instant){
   }
 }
 /* ---------- MLQ queue lanes in the stage ---------- */
-function laneOf(i){ return Math.min(S.mlq.n, S.procs[i].queue) - 1; }
+/* which lane a task sits in at this moment: fixed for MLQ, from the snapshot for MLFQ */
+function laneOf(i, sn){
+  if (S.algo === 'MLFQ') return sn && sn.lvl ? sn.lvl[i] : 0;
+  return Math.min(S.mlq.n, S.procs[i].queue) - 1;
+}
 function buildLanes(){
-  var on = S.algo === 'MLQ', box = $('qlanes');
+  var on = isML(S.algo), box = $('qlanes'), cfg = cfgFor(S.algo), nq = cfg.algos.length;
   box.hidden = !on; $('ready').hidden = on;
   $('readyLbl').textContent = on ? 'Ready queues' : 'Ready';
   box.replaceChildren();
   if (!on) return;
-  for (var qi = 0; qi < S.mlq.n; qi++){
-    var a = S.mlq.algos[qi];
+  for (var qi = 0; qi < nq; qi++){
+    var a = cfg.algos[qi];
     box.appendChild(h('div', {class: 'qlane', id: 'qlane' + qi},
-      h('div', {class: 'qh'}, h('span', null, 'Q' + (qi + 1) + (qi === 0 ? ' \u00b7 highest' : qi === S.mlq.n - 1 ? ' \u00b7 lowest' : '')), h('small', null, a + (a === 'RR' ? ' q=' + S.mlq.q[qi] : ''))),
+      h('div', {class: 'qh'}, h('span', null, 'Q' + (qi + 1) + (qi === 0 ? ' \u00b7 highest' : qi === nq - 1 ? ' \u00b7 lowest' : '')), h('small', null, a + (a === 'RR' ? ' q=' + cfg.q[qi] : ''))),
       h('div', {class: 'qtray', id: 'qtray' + qi}, h('span', {class: 'hint'}, 'empty'))));
   }
 }
 /* highlight the queue that owns the CPU; dim queues waiting behind a higher queue */
 function laneState(sn){
-  var top = S.mlq.n, rq = sn.run >= 0 ? laneOf(sn.run) : -1;
-  sn.ready.concat(sn.run >= 0 ? [sn.run] : []).forEach(function(i){ top = Math.min(top, laneOf(i)); });
-  for (var qi = 0; qi < S.mlq.n; qi++){
+  var nq = cfgFor(S.algo).algos.length, top = nq, rq = sn.run >= 0 ? laneOf(sn.run, sn) : -1;
+  sn.ready.concat(sn.run >= 0 ? [sn.run] : []).forEach(function(i){ top = Math.min(top, laneOf(i, sn)); });
+  for (var qi = 0; qi < nq; qi++){
     var lane = $('qlane' + qi), tray = $('qtray' + qi), has = tray.querySelector('.token') !== null;
     tray.querySelector('.hint').hidden = has;
     lane.classList.toggle('on', qi === rq);
@@ -1051,7 +1133,8 @@ function cpuText(sn, k){
     var b = S.procs[run].burst, left = sn.rem[run];
     $('cBig').textContent = S.procs[run].id;
     $('cSub').textContent = left + ' of ' + b + ' left';
-    var rr = S.algo === 'RR' ? S.quantum : S.algo === 'MLQ' && S.mlq.algos[laneOf(run)] === 'RR' ? S.mlq.q[laneOf(run)] : 0;
+    var cf = isML(S.algo) ? cfgFor(S.algo) : null, ln = cf ? laneOf(run, sn) : 0;
+    var rr = S.algo === 'RR' ? S.quantum : cf && cf.algos[ln] === 'RR' ? cf.q[ln] : 0;
     $('cQ').textContent = rr && sn.qu ? 'quantum ' + sn.qu + ' of ' + rr : '';
     var nd = b <= 20 ? b : 0; /* long bursts: skip the dots, the text already says how much is left */
     if (dots.childNodes.length !== nd || dots.dataset.pid !== String(run)){ dots.replaceChildren(); dots.dataset.pid = run; for (var j = 0; j < nd; j++) dots.appendChild(h('i')); }
@@ -1108,7 +1191,7 @@ document.addEventListener('keydown', function(e){
   if (e.code === 'Space'){ e.preventDefault(); $('play').click(); }
   else if (e.code === 'ArrowRight'){ e.preventDefault(); stepBy(e.shiftKey ? 5 : 1); }
   else if (e.code === 'ArrowLeft'){ e.preventDefault(); stepBy(e.shiftKey ? -5 : -1); }
-  else if (/^[1-7]$/.test(e.key) && S.algo !== ALGOS[+e.key - 1]){ pushUndo(); S.algo = ALGOS[+e.key - 1]; say(''); buildAll(); }
+  else if (/^[1-8]$/.test(e.key) && S.algo !== ALGOS[+e.key - 1]){ pushUndo(); S.algo = ALGOS[+e.key - 1]; say(''); buildAll(); }
 });
 
 /* ---------- views ---------- */
@@ -1130,6 +1213,7 @@ function modeText(){
   if (S.algo !== 'FCFS' && S.algo !== 'RR' && S.algo !== 'HRRN') t += S.preempt ? ' (preemptive)' : ' (non-preemptive)';
   if (S.algo === 'RR') t += ', quantum ' + S.quantum;
   if (S.algo === 'MLQ') t += ', ' + mlqText();
+  if (S.algo === 'MLFQ') t += ', ' + mlfqText();
   return t;
 }
 function download(blob, name){
@@ -1444,7 +1528,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#cmpExport [data-x]'), f
 });
 
 function recompute(){
-  S.sim = simulate(S.procs, S.algo, S.quantum, S.preempt, mlqCfg());
+  S.sim = simulate(S.procs, S.algo, S.quantum, S.preempt, cfgFor(S.algo));
   S.t = Math.min(S.t, S.sim.total);
   buildGantt(); buildMetrics(); buildLanes();
   S.sig = ''; S.run = -2;

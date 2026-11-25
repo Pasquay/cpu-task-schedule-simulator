@@ -89,30 +89,10 @@ h3{margin:0;font-size:22px;font-weight:800}
 .note:empty{display:none}
 .note.info{color:var(--muted)}
 .algoname{font-weight:600;color:var(--muted)}
-.mlq{display:flex;flex-direction:column;gap:10px}
-.mlqrow{display:grid;grid-template-columns:56px 1fr 72px;gap:10px;align-items:center}
-.mlqrow .lbl small{display:block;font:400 11px var(--mono)}
-select.num{-webkit-appearance:none;appearance:none;cursor:pointer;font:600 15px var(--text);padding:0 12px}
-.mlqn .tab{height:36px;padding:0 16px}
 .strip,#ctable tbody tr{transition:opacity .18s var(--ease),filter .18s var(--ease)}
 #cmpView.dim .strip:not(.hot){opacity:.22;filter:grayscale(1)}
 .strip,#ctable tbody tr{cursor:default}
-.cbar,.bar,#readyZone .token,#done .token{cursor:help}
-.qlanes{width:100%;display:flex;flex-direction:column;gap:10px}
-.qlane{display:flex;flex-direction:column;gap:4px;transition:opacity .2s var(--ease)}
-.qlane .qh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 6px 0 14px;font:600 13px var(--text);color:var(--muted)}
-.qh .ctl{display:flex;gap:6px;align-items:center;font:400 12px var(--mono)}
-.qh .num{height:30px;border-radius:10px;font-size:13px}
-.qh select.num{width:92px;padding:0 8px}
-.qh input.num{width:42px}
-.qh .fixed{display:inline-flex;align-items:center;justify-content:center;width:92px;height:30px;border-radius:10px;background:var(--tray);font:600 13px var(--text);color:var(--ink)}
-.qlane .qh small{font:400 12px var(--mono)}
-.qtray{min-height:58px;background:var(--tray);border-radius:30px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;position:relative;border:3px solid transparent;transition:border-color .2s var(--ease)}
-.qtray .token{padding:8px 14px;font-size:14px}
-.qtray .hint{position:static;margin:0 auto}
-.qlane.on .qtray{border-color:var(--ink)}
-.qlane.on .qh{color:var(--ink)}
-.qlane.blocked .qtray{opacity:.4}
+.cbar,.bar,#ready .token,#done .token{cursor:help}
 .cookie .qsub{font:400 12px var(--mono);opacity:.85}
 .tip{position:fixed;z-index:60;pointer-events:none;background:var(--charcoal);color:#fff;border-radius:14px;padding:10px 14px;font:400 13px/1.5 var(--mono);white-space:pre;box-shadow:0 6px 20px #0003}
 .tip b{font:600 14px var(--text);display:block;margin-bottom:2px}
@@ -283,7 +263,6 @@ td.aname small{display:block;margin-top:2px}
         <div class="shead">
           <h2>Stage <span class="algoname" id="algoName"></span></h2>
           <div class="scfg" id="stageCfg">
-            <span class="lbl" id="preLbl" hidden>Between queues</span>
             <div class="seg pre" id="preRow" role="group" aria-label="Preemption" hidden>
               <button class="tab on" data-p="1" aria-pressed="true">Preemptive</button>
               <button class="tab" data-p="0" aria-pressed="false">Non-preemptive</button>
@@ -292,20 +271,12 @@ td.aname small{display:block;margin-top:2px}
               <label class="lbl" for="quantum">Time quantum</label>
               <input class="num" id="quantum" type="text" inputmode="numeric" autocomplete="off" value="2">
             </div>
-            <div class="quantum" id="queueNRow" hidden>
-              <span class="lbl">Queues</span>
-              <div class="seg" id="queueN" role="group" aria-label="Number of queues"><button class="tab" data-n="2">2</button><button class="tab" data-n="3">3</button></div>
-            </div>
-            <div class="quantum" id="agingRow" hidden>
-              <label class="lbl" for="aging">Aging (ticks, 0 = off)</label>
-              <input class="num" id="aging" type="text" inputmode="numeric" autocomplete="off" value="0">
-            </div>
           </div>
         </div>
         <div class="tread"><b id="tRead">0</b><span>time t</span></div>
       </div>
       <div class="zones">
-        <div class="zone" id="readyZone"><span class="lbl" id="readyLbl">Ready</span><div class="tray ready" id="ready"><span class="hint">nothing waiting</span></div><div class="qlanes" id="qlanes" hidden></div></div>
+        <div class="zone"><span class="lbl">Ready</span><div class="tray ready" id="ready"><span class="hint">nothing waiting</span></div></div>
         <div class="cpu">
           <span class="lbl" style="font-size:15px">CPU</span>
           <div class="cookie" id="cookie">
@@ -374,8 +345,7 @@ td.aname small{display:block;margin-top:2px}
 
 <script>
 /*ENGINE_START*/
-/* mlq (MLQ only): {algos: ['RR','FCFS',...], q: [quantum per queue]}; queue 1 is the highest */
-function simulate(procs, algo, quantum, preemptive, mlq){
+function simulate(procs, algo, quantum, preemptive){
   var n = procs.length, i;
   for (i = 0; i < n; i++){
     var pv = procs[i];
@@ -391,76 +361,34 @@ function simulate(procs, algo, quantum, preemptive, mlq){
   for (i = 0; i < n; i++){ finish.push(0); first.push(-1); isDone.push(false); }
   var ticks = [], snap = [];
   var queue = [], cur = -1, qUsed = 0, doneCount = 0, t = 0;
-  /* MLQ and MLFQ share this path; MLFQ (isFB) moves tasks between queues */
-  var isFB = algo === 'MLFQ', isMLQ = algo === 'MLQ' || isFB, nq = isMLQ ? mlq.algos.length : 0, fifo = [];
-  var aging = isFB ? (mlq.aging || 0) : 0, waitT = procs.map(function(){ return 0; });
-  for (i = 0; i < nq; i++) fifo.push([]);
-  /* MLQ: fixed queue from the task's Queue field; MLFQ: everyone starts in Q1 */
-  var qOf = procs.map(function(p){ return isFB ? 0 : isMLQ ? Math.min(nq, Math.max(1, p.queue || 1)) - 1 : 0; });
-  /* queues kept as an ordered line: RR queues, and every MLFQ queue (order = order of entering it) */
-  function usesFifo(q){ return isFB || mlq.algos[q] === 'RR'; }
-  /* order inside one MLQ queue (RR queues use their own FIFO list instead) */
-  function mkey(j){
-    var a = mlq.algos[qOf[j]];
-    if (a === 'SJF') return [burst[j], arrival[j], j];
-    if (a === 'Priority') return [pri[j], arrival[j], j];
-    return [arrival[j], j];
-  }
-  /* highest queue that has an arrived, unfinished task (nq if none) */
-  function topQueue(){ var b = nq; for (var j = 0; j < n; j++) if (!isDone[j] && arrival[j] <= t && qOf[j] < b) b = qOf[j]; return b; }
   function cmp(a, b){ for (var j = 0; j < a.length; j++){ if (a[j] < b[j]) return -1; if (a[j] > b[j]) return 1; } return 0; }
   function key(j){
     if (algo === 'SJF' && preemptive === false) return [burst[j], arrival[j], j];
     if (algo === 'SRTF' || (algo === 'SJF' && preemptive !== false)) return [rem[j], arrival[j], j];
-    /* LRTF: longest remaining time first (negated so the smallest key wins); non-preemptive = LJF, by burst */
-    /* LIFO: newest arrival first; among equal arrivals the task added later counts as newer */
-    if (algo === 'LIFO') return [-arrival[j], -j];
-    if (algo === 'LRTF') return preemptive === false ? [-burst[j], arrival[j], j] : [-rem[j], arrival[j], j];
     if (algo === 'Priority') return [pri[j], arrival[j], j];
-    /* HRRN: response ratio = (waiting + burst) / burst, highest first (negated so the smallest key wins) */
-    if (algo === 'HRRN') return [-((t - arrival[j] + burst[j]) / burst[j]), arrival[j], j];
     return [arrival[j], j];
   }
   function cands(){ var o = []; for (var j = 0; j < n; j++) if (!isDone[j] && arrival[j] <= t) o.push(j); return o; }
-  function enqueueArrivals(){ for (var j = 0; j < n; j++) if (arrival[j] === t) (isMLQ ? fifo[qOf[j]] : queue).push(j); }
+  function enqueueArrivals(){ for (var j = 0; j < n; j++) if (arrival[j] === t) queue.push(j); }
   if (n === 0) return {segments:[], ticks:[], snap:[{run:-1,ready:[],done:[],rem:[]}], metrics:[], avg:{turnaround:0,waiting:0,response:0}, total:0, util:0, switches:0};
   enqueueArrivals();
   while (doneCount < n && t < 5000){
     var next = -1, preempt = false, list, j;
-    if (isMLQ){
-      var tq = topQueue();
-      /* a task waiting in a higher queue interrupts the running one (preemptive mode only) */
-      if (cur !== -1 && preemptive !== false && tq < qOf[cur]){
-        /* interrupted RR task goes to the back of its line; an MLFQ FCFS task keeps its place at the front */
-        if (usesFifo(qOf[cur])){ if (isFB && mlq.algos[qOf[cur]] !== 'RR') fifo[qOf[cur]].unshift(cur); else fifo[qOf[cur]].push(cur); }
-        cur = -1; qUsed = 0;
-      }
-      if (cur !== -1) next = cur;
-      else if (tq < nq){
-        if (usesFifo(tq)) next = fifo[tq].shift();
-        else { list = cands().filter(function(x){ return qOf[x] === tq; }); list.sort(function(a, b){ return cmp(mkey(a), mkey(b)); }); next = list[0]; }
-      }
-    } else if (algo === 'RR'){
+    if (algo === 'RR'){
       if (cur !== -1 && qUsed < quantum) next = cur;
       else if (queue.length) next = queue.shift();
-    } else if (algo === 'FCFS' || algo === 'HRRN' || preemptive === false){
+    } else if (algo === 'FCFS' || preemptive === false){
       if (cur !== -1) next = cur;
       else { list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0]; }
     } else {
       list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0];
     }
     /* preemptive SJF/SRTF/Priority: on a tie in remaining time or priority, the running task keeps the CPU */
-    if ((algo === 'SJF' || algo === 'SRTF' || algo === 'LRTF' || algo === 'Priority') && preemptive !== false && cur !== -1 && next !== cur && key(cur)[0] === key(next)[0]) next = cur;
+    if ((algo === 'SJF' || algo === 'SRTF' || algo === 'Priority') && preemptive !== false && cur !== -1 && next !== cur && key(cur)[0] === key(next)[0]) next = cur;
     var ready;
     if (algo === 'RR') ready = queue.slice();
-    else if (isMLQ){
-      ready = [];
-      for (var qi = 0; qi < nq; qi++){
-        if (usesFifo(qi)) ready = ready.concat(fifo[qi]);
-        else { list = cands().filter(function(x){ return qOf[x] === qi && x !== next; }); list.sort(function(a, b){ return cmp(mkey(a), mkey(b)); }); ready = ready.concat(list); }
-      }
-    } else { ready = cands().filter(function(x){ return x !== next; }); ready.sort(function(a, b){ return cmp(key(a), key(b)); }); }
-    snap.push({run: next, ready: ready, rem: rem.slice(), lvl: isFB ? qOf.slice() : null});
+    else { ready = cands().filter(function(x){ return x !== next; }); ready.sort(function(a, b){ return cmp(key(a), key(b)); }); }
+    snap.push({run: next, ready: ready, rem: rem.slice()});
     ticks.push(next);
     if (next === -1){ cur = -1; qUsed = 0; }
     else {
@@ -468,28 +396,11 @@ function simulate(procs, algo, quantum, preemptive, mlq){
       rem[next]--; qUsed++;
       snap[snap.length - 1].qu = qUsed; /* ticks of the current quantum used, including this one */
       if (rem[next] === 0){ isDone[next] = true; finish[next] = t + 1; doneCount++; cur = -1; qUsed = 0; }
-      else if ((algo === 'RR' && qUsed >= quantum) || (isMLQ && mlq.algos[qOf[next]] === 'RR' && qUsed >= mlq.q[qOf[next]])){ preempt = true; cur = -1; qUsed = 0; }
+      else if (algo === 'RR' && qUsed >= quantum){ preempt = true; cur = -1; qUsed = 0; }
       else cur = next;
     }
     t++;
     if (algo === 'RR'){ enqueueArrivals(); if (preempt) queue.push(next); }
-    else if (isMLQ){
-      enqueueArrivals();
-      if (preempt){
-        /* MLFQ: used its whole quantum without finishing, so it drops one queue */
-        if (isFB && qOf[next] < nq - 1) qOf[next]++;
-        fifo[qOf[next]].push(next);
-      }
-      /* MLFQ aging: a task waiting `aging` ticks in a lower queue moves up one queue */
-      if (aging > 0) for (j = 0; j < n; j++){
-        if (isDone[j] || arrival[j] >= t || j === next){ waitT[j] = 0; continue; }
-        waitT[j]++;
-        if (qOf[j] > 0 && waitT[j] >= aging){
-          var ix = fifo[qOf[j]].indexOf(j); if (ix >= 0) fifo[qOf[j]].splice(ix, 1);
-          qOf[j]--; fifo[qOf[j]].push(j); waitT[j] = 0;
-        }
-      }
-    }
   }
   var total = ticks.length;
   snap.push({run: -1, ready: [], rem: rem.slice()});
@@ -531,26 +442,7 @@ function simulate(procs, algo, quantum, preemptive, mlq){
 <script>
 (function(){
 'use strict';
-var ALGOS = ['FCFS','LIFO','SJF','SRTF','LRTF','RR','Priority','HRRN','MLQ','MLFQ'];
-var MLQ_ALGOS = ['FCFS', 'SJF', 'RR', 'Priority'];
-function defaultMlq(){ return {n: 2, algos: ['RR', 'FCFS', 'SJF'], q: [2, 4, 8]}; }
-function copyMlq(m){ return {n: m.n, algos: m.algos.slice(), q: m.q.slice()}; }
-function mlqCfg(){ return {algos: S.mlq.algos.slice(0, S.mlq.n), q: S.mlq.q.slice(0, S.mlq.n)}; }
-function mlqText(){ return mlqCfg().algos.map(function(a, i){ return 'Q' + (i + 1) + ' ' + a + (a === 'RR' ? ' q=' + S.mlq.q[i] : ''); }).join(', '); }
-function mlqUsesPri(){ return mlqCfg().algos.indexOf('Priority') >= 0; }
-/* MLFQ: every queue but the last is RR (that's what drives demotion); the last is FCFS or RR */
-function defaultMlfq(){ return {n: 3, q: [2, 4, 8], last: 'FCFS', aging: 0}; }
-function copyMlfq(m){ return {n: m.n, q: m.q.slice(), last: m.last, aging: m.aging}; }
-function mlfqCfg(){
-  var a = []; for (var i = 0; i < S.mlfq.n; i++) a.push(i < S.mlfq.n - 1 ? 'RR' : S.mlfq.last);
-  return {algos: a, q: S.mlfq.q.slice(0, S.mlfq.n), aging: S.mlfq.aging};
-}
-function mlfqText(){
-  var c = mlfqCfg();
-  return c.algos.map(function(a, i){ return 'Q' + (i + 1) + ' ' + a + (a === 'RR' ? ' q=' + c.q[i] : ''); }).join(', ') + (c.aging ? ', aging ' + c.aging : ', no aging');
-}
-function cfgFor(a){ return a === 'MLFQ' ? mlfqCfg() : mlqCfg(); }
-function isML(a){ return a === 'MLQ' || a === 'MLFQ'; }
+var ALGOS = ['FCFS','SJF','SRTF','RR','Priority'];
 var MAXT = 10, LETTERS = 'ABCDEFGHIJ';
 var COL = ['#3F63F2','#FFC93C','#FF4F2E','#2B2B2E','#B9A8FF','#4FD1A5','#FF8FC8','#0E7C66','#A8E05F','#8B5E34'];
 var INK = ['#FFFFFF','#18181B','#18181B','#FFFFFF','#18181B','#18181B','#18181B','#FFFFFF','#18181B','#FFFFFF'];
@@ -562,28 +454,18 @@ var PRESETS = [
    why: 'nothing has arrived during 0\u20132 and 7\u20139, so the CPU sits idle.'},
   {name: 'Arrival tie', algo: 'FCFS', rows: [[0,4,1],[0,2,1],[0,3,1]],
    why: 'A, B and C all arrive at t = 0, so they run in task order: A, B, C.'},
-  {name: 'LIFO order', algo: 'LIFO', preempt: false, rows: [[0,3,1],[1,2,1],[2,2,1],[2,1,1]],
-   why: 'A runs first (it is alone). At t = 3 the newest arrivals are C and D (both t = 2); D was added after C, so D goes first, then C. B, the oldest waiter, goes last.'},
   {name: 'Burst tie', algo: 'SJF', preempt: false, rows: [[0,3,1],[2,2,1],[1,2,1],[1,2,1]],
    why: 'B, C and D all have burst 2. Earlier arrival wins (C, D before B), then task order (C before D).'},
   {name: 'Priority tie', algo: 'Priority', preempt: false, rows: [[0,4,3],[1,3,1],[2,2,1],[1,1,2]],
    why: 'lower number = higher priority. B and C share priority 1, so earlier arrival (B) goes first.'},
   {name: 'SRTF tie', algo: 'SRTF', preempt: true, rows: [[0,5,1],[2,3,1],[4,1,1]],
-   why: 'B arrives at t = 2 needing 3, the same as A has left, so A keeps the CPU. Same when C arrives at t = 4.'},
-  {name: 'LRTF tie', algo: 'LRTF', preempt: true, rows: [[0,3,1],[1,4,1],[2,2,1]],
-   why: 'the task with the most time left runs. On a tie the running task keeps the CPU (B at t = 3, C at t = 6); otherwise earlier arrival wins (A at t = 4).'},
-  {name: 'HRRN ratio', algo: 'HRRN', rows: [[0,3,1],[1,6,1],[2,4,1]],
-   why: 'at t = 3, B\u2019s ratio is (2 + 6) / 6 = 1.33 and C\u2019s is (1 + 4) / 4 = 1.25, so B runs first even though C is shorter.'},
-  {name: 'MLQ preemption', algo: 'MLQ', preempt: true, mlq: {n: 2, algos: ['RR', 'FCFS', 'SJF'], q: [2, 4, 8]}, rows: [[0,5,1,2],[2,3,1,1],[3,2,1,1]],
-   why: 'Q1 is RR (q = 2), Q2 is FCFS. A (Q2) starts alone, B arrives in Q1 at t = 2 and preempts it. Q1 runs B, C, B until it empties at t = 7, then A resumes.'},
-  {name: 'MLFQ demotion', algo: 'MLFQ', preempt: true, mlfq: {n: 3, q: [2, 4, 8], last: 'FCFS', aging: 0}, rows: [[0,8,1],[1,2,1],[5,3,1]],
-   why: 'Q1 RR q=2, Q2 RR q=4, Q3 FCFS. A uses its whole Q1 quantum and drops to Q2. Short B finishes inside Q1. C arrives at t = 5 and preempts A, then also drops. A keeps using full quanta and ends in Q3.'}
+   why: 'B arrives at t = 2 needing 3, the same as A has left, so A keeps the CPU. Same when C arrives at t = 4.'}
 ];
-function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arrival: r[0], burst: r[1], priority: r[2], queue: r[3] || 1 + (i % 2)}; }); }
+function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arrival: r[0], burst: r[1], priority: r[2]}; }); }
 
-var FULL = {FCFS: 'First Come First Serve', LIFO: 'Last In First Out', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', LRTF: 'Longest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling', HRRN: 'Highest Response Ratio Next', MLQ: 'Multilevel Queue', MLFQ: 'Multilevel Feedback Queue'};
-function defaultPre(){ return {FCFS: false, LIFO: false, SJF: false, SRTF: true, LRTF: true, RR: true, Priority: true, HRRN: false, MLQ: true, MLFQ: true}; }
-var S = {sortM: {col: 'task', dir: 'desc'}, sortC: {col: 'algo', dir: 'desc'}, algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), mlq: defaultMlq(), mlfq: defaultMlfq(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
+var FULL = {FCFS: 'First Come First Serve', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling'};
+function defaultPre(){ return {FCFS: false, SJF: false, SRTF: true, RR: true, Priority: true}; }
+var S = {sortM: {col: 'task', dir: 'desc'}, sortC: {col: 'algo', dir: 'desc'}, algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
 
 function $(id){ return document.getElementById(id); }
 function h(tag, attrs){
@@ -611,12 +493,12 @@ function fmt(n){ return (Math.round(n * 100) / 100).toFixed(2); }
 function tokenStyle(i){ return 'background:' + COL[i] + ';color:' + INK[i] + ';border-radius:' + SHAPE[i]; }
 
 /* ---------- history ---------- */
-function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt, pre: Object.assign({}, S.pre), mlq: copyMlq(S.mlq), mlfq: copyMlfq(S.mlfq)}; }
+function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt, pre: Object.assign({}, S.pre)}; }
 function pushUndo(){ S.preset = -1; S.undo.push(snapshot()); if (S.undo.length > 40) S.undo.shift(); $('undo').disabled = false; }
 function undo(){
   var s = S.undo.pop();
   if (!s){ say('Nothing to undo.'); return; }
-  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt; S.pre = s.pre; S.mlq = s.mlq; S.mlfq = s.mlfq;
+  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt; S.pre = s.pre;
   $('undo').disabled = !S.undo.length;
   say('Undone.'); buildAll();
 }
@@ -688,83 +570,26 @@ function buildTabs(){
   });
   S.preempt = S.pre[S.algo];
   $('algoName').textContent = '(' + FULL[S.algo] + ')';
-  $('preRow').hidden = S.algo === 'FCFS' || S.algo === 'RR' || S.algo === 'HRRN';
+  $('preRow').hidden = S.algo === 'FCFS' || S.algo === 'RR';
   Array.prototype.forEach.call($('preRow').children, function(b){
     var on = (b.dataset.p === '1') === S.preempt;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   });
   $('qRow').hidden = S.algo !== 'RR';
   $('quantum').value = S.quantum;
-  buildCfg();
-}
-/* settings band under the stage title: queue count and aging for MLQ / MLFQ */
-function buildCfg(){
-  var ml = isML(S.algo), fb = S.algo === 'MLFQ', n = fb ? S.mlfq.n : S.mlq.n;
-  $('preLbl').hidden = !ml;
-  $('queueNRow').hidden = !ml;
-  Array.prototype.forEach.call($('queueN').children, function(b){ var on = +b.dataset.n === n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  $('agingRow').hidden = !fb; $('aging').value = S.mlfq.aging;
-  $('stageCfg').hidden = $('preRow').hidden && $('qRow').hidden && !ml;
-}
-Array.prototype.forEach.call($('queueN').children, function(b){
-  b.addEventListener('click', function(){
-    var n = +b.dataset.n, fb = S.algo === 'MLFQ';
-    if (n === (fb ? S.mlfq.n : S.mlq.n)) return;
-    pushUndo();
-    if (fb) S.mlfq.n = n;
-    else { S.mlq.n = n; S.procs.forEach(function(p){ if (p.queue > n) p.queue = n; }); }
-    say(''); buildAll();
-  });
-});
-$('aging').addEventListener('input', function(){ markBad(this, false); });
-$('aging').addEventListener('change', function(){
-  var r = checkNum(this.value, 'Aging', 0, 99);
-  if (r.err){ markBad(this, true); say(r.err + ' Still using ' + S.mlfq.aging + '.'); return; }
-  markBad(this, false); this.value = r.v; say('');
-  if (r.v === S.mlfq.aging) return;
-  pushUndo(); S.mlfq.aging = r.v; recompute();
-});
-/* small numeric box used in the queue lane headers */
-function qInput(label, val, lo, hi, set){
-  return h('input', {class: 'num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: val, 'aria-label': label, title: label,
-    oninput: function(){ markBad(this, false); },
-    onchange: function(){
-      var r = checkNum(this.value, label, lo, hi);
-      if (r.err){ markBad(this, true); say(r.err + ' Still using ' + val + '.'); return; }
-      markBad(this, false); this.value = r.v; say('');
-      if (r.v === val) return;
-      pushUndo(); set(r.v); val = r.v; recompute();
-    }});
-}
-/* controls in each queue lane's header: algorithm, plus quantum for RR */
-function laneControls(qi, nq){
-  var fb = S.algo === 'MLFQ', last = qi === nq - 1, a, algoEl;
-  if (fb){
-    a = last ? S.mlfq.last : 'RR';
-    algoEl = last ? h('select', {class: 'num', 'aria-label': 'Algorithm for Q' + (qi + 1), onchange: function(){ pushUndo(); S.mlfq.last = this.value; say(''); buildAll(); }},
-      ['FCFS', 'RR'].map(function(x){ var o = h('option', {value: x}, x); if (x === a) o.selected = true; return o; }))
-      : h('span', {class: 'fixed', title: 'Upper MLFQ queues are always RR: using a full quantum is what moves a task down'}, 'RR');
-  } else {
-    a = S.mlq.algos[qi];
-    algoEl = h('select', {class: 'num', 'aria-label': 'Algorithm for Q' + (qi + 1), onchange: function(){ pushUndo(); S.mlq.algos[qi] = this.value; say(''); buildAll(); }},
-      MLQ_ALGOS.map(function(x){ var o = h('option', {value: x}, x); if (x === a) o.selected = true; return o; }));
-  }
-  var q = fb ? S.mlfq.q : S.mlq.q;
-  return h('div', {class: 'ctl'}, algoEl, a === 'RR' ? ['q', qInput('Quantum for Q' + (qi + 1), q[qi], 1, 9, function(v){ q[qi] = v; })] : null);
+  $('stageCfg').hidden = $('preRow').hidden && $('qRow').hidden;
 }
 function buildWorkload(){
-  var g = $('wl'), mlq = S.algo === 'MLQ', pri = S.algo === 'Priority' || (mlq && mlqUsesPri());
+  var g = $('wl'), pri = S.algo === 'Priority';
   g.className = 'wl';
-  g.style.gridTemplateColumns = '56px repeat(' + (2 + (pri ? 1 : 0) + (mlq ? 1 : 0)) + ', 1fr)';
+  g.style.gridTemplateColumns = '56px repeat(' + (2 + (pri ? 1 : 0)) + ', 1fr)';
   g.replaceChildren(h('span', {class: 'lbl'}, 'Task'), h('span', {class: 'lbl c'}, 'Arrival'), h('span', {class: 'lbl c'}, 'Burst'));
   if (pri) g.appendChild(h('span', {class: 'lbl c'}, 'Priority'));
-  if (mlq) g.appendChild(h('span', {class: 'lbl c'}, 'Queue'));
   S.procs.forEach(function(p, i){
     g.appendChild(h('span', {class: 'token', 'data-pill': i, style: tokenStyle(i)}, p.id));
     g.appendChild(numInput(i, 'arrival', 'Arrival', 0, 100));
     g.appendChild(numInput(i, 'burst', 'Burst', 1, 100));
     if (pri) g.appendChild(numInput(i, 'priority', 'Priority', 1, 9));
-    if (mlq) g.appendChild(numInput(i, 'queue', 'Queue', 1, S.mlq.n));
   });
   $('count').textContent = S.procs.length + (S.procs.length === 1 ? ' task' : ' tasks');
   $('plus').disabled = S.procs.length >= MAXT;
@@ -799,7 +624,7 @@ $('plus').addEventListener('click', function(){
   if (S.procs.length >= MAXT){ say(MAXT + ' tasks is the maximum.'); return; }
   pushUndo();
   var i = S.procs.length;
-  S.procs.push({id: LETTERS[i], arrival: Math.min(20, i * 2), burst: 3, priority: (i % 3) + 1, queue: 1 + (i % S.mlq.n)});
+  S.procs.push({id: LETTERS[i], arrival: Math.min(20, i * 2), burst: 3, priority: (i % 3) + 1});
   say(''); buildWorkload(); recompute();
 });
 $('minus').addEventListener('click', function(){
@@ -824,7 +649,7 @@ $('quantum').addEventListener('change', function(){
 $('rand').addEventListener('click', function(){
   pushUndo();
   var c = 3 + Math.floor(Math.random() * (MAXT - 2)), i, rows = [];
-  for (i = 0; i < c; i++) rows.push([Math.floor(Math.random() * 9), 1 + Math.floor(Math.random() * 7), 1 + Math.floor(Math.random() * 4), 1 + Math.floor(Math.random() * S.mlq.n)]);
+  for (i = 0; i < c; i++) rows.push([Math.floor(Math.random() * 9), 1 + Math.floor(Math.random() * 7), 1 + Math.floor(Math.random() * 4)]);
   S.procs = mk(rows); say(''); buildWorkload(); recompute();
 });
 function loadEdge(k){
@@ -833,8 +658,6 @@ function loadEdge(k){
   S.preset = k;
   S.procs = mk(p.rows); S.algo = p.algo;
   if (p.preempt !== undefined) S.pre[p.algo] = p.preempt;
-  if (p.mlq) S.mlq = copyMlq(p.mlq);
-  if (p.mlfq) S.mlfq = copyMlfq(p.mlfq);
   S.t = 0; buildAll();
   say('');
   var w = $('edgeWhy'); w.replaceChildren(h('b', null, (k + 1) + '. ' + p.name + ' \u00b7 ' + p.algo + (p.preempt === false ? ' (non-preemptive)' : p.preempt ? ' (preemptive)' : '') + ': '), p.why);
@@ -851,7 +674,7 @@ function markEdge(){
   $('edgeWhy').hidden = S.preset < 0; /* explanation only while the example is untouched */
 }
 $('reset').addEventListener('click', function(){
-  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.pre = defaultPre(); S.mlq = defaultMlq(); S.mlfq = defaultMlfq(); S.preset = -1; say(''); buildAll();
+  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.pre = defaultPre(); S.preset = -1; say(''); buildAll();
 });
 $('undo').addEventListener('click', undo);
 
@@ -943,15 +766,15 @@ function buildMetrics(){
 }
 function drawMetricsTable(){
   var s = S.sim, tb = $('mtable'); tb.replaceChildren();
-  var mq = S.algo === 'MLQ', st = S.sortM;
-  var cols = [['task', 'Task'], ['arrival', 'Arrival'], ['burst', 'Burst']].concat(mq ? [['queue', 'Queue']] : [], [['finish', 'Finish'], ['turnaround', 'Turnaround'], ['waiting', 'Waiting'], ['response', 'Response']]);
+  var st = S.sortM;
+  var cols = [['task', 'Task'], ['arrival', 'Arrival'], ['burst', 'Burst']].concat([['finish', 'Finish'], ['turnaround', 'Turnaround'], ['waiting', 'Waiting'], ['response', 'Response']]);
   if (!cols.some(function(c){ return c[0] === st.col; })){ st.col = 'task'; st.dir = 'desc'; }
   tb.appendChild(h('thead', null, h('tr', null, cols.map(function(c){ return sortHead(c[1], c[0], st, 'task', drawMetricsTable); }))));
   var body = h('tbody');
-  sortedIdx(s.metrics.length, st, 'task', function(i){ return st.col === 'queue' ? S.procs[i].queue : s.metrics[i][st.col]; }).forEach(function(i){
+  sortedIdx(s.metrics.length, st, 'task', function(i){ return s.metrics[i][st.col]; }).forEach(function(i){
     var m = s.metrics[i];
     body.appendChild(h('tr', null, h('td', null, h('span', {class: 'token', style: tokenStyle(i)}, m.id)),
-      h('td', null, m.arrival), h('td', null, m.burst), mq ? h('td', null, 'Q' + Math.min(S.mlq.n, S.procs[i].queue)) : null, h('td', null, m.finish), h('td', null, m.turnaround), h('td', null, m.waiting), h('td', null, m.response)));
+      h('td', null, m.arrival), h('td', null, m.burst), h('td', null, m.finish), h('td', null, m.turnaround), h('td', null, m.waiting), h('td', null, m.response)));
   });
   tb.appendChild(body);
 }
@@ -961,15 +784,14 @@ function drawMetricsTable(){
 function compareRuns(){
   var v = [];
   ALGOS.forEach(function(a){
-    if (a === 'SJF' || a === 'LIFO' || a === 'Priority'){ v.push([a, false]); v.push([a, true]); }
-    else if (a === 'SRTF' || a === 'LRTF'){ v.push([a, true]); v.push([a, false]); }
-    else if (isML(a)){ v.push([a, true]); v.push([a, false]); }
+    if (a === 'SJF' || a === 'Priority'){ v.push([a, false]); v.push([a, true]); }
+    else if (a === 'SRTF'){ v.push([a, true]); v.push([a, false]); }
     else v.push([a, a === 'RR']);
   });
   return v.map(function(x){
-    var a = x[0], pre = x[1], both = a === 'SJF' || a === 'LIFO' || a === 'SRTF' || a === 'LRTF' || a === 'Priority' || isML(a);
+    var a = x[0], pre = x[1], both = a === 'SJF' || a === 'SRTF' || a === 'Priority';
     var mode = both ? (pre ? 'preemptive' : 'non-preemptive') : a === 'RR' ? 'quantum ' + S.quantum : 'non-preemptive';
-    return {a: a, pre: pre, mode: mode, s: simulate(S.procs, a, S.quantum, pre, cfgFor(a))};
+    return {a: a, pre: pre, mode: mode, s: simulate(S.procs, a, S.quantum, pre)};
   });
 }
 var CMP_COLS = [['turnaround', 'Avg turnaround', -1], ['waiting', 'Avg waiting', -1], ['response', 'Avg response', -1], ['util', 'CPU busy', 1], ['switches', 'Switches', -1]];
@@ -980,7 +802,7 @@ function cmpBest(res){
   CMP_COLS.forEach(function(c){ var vs = res.map(function(r){ return cmpVal(r, c[0]); }); best[c[0]] = c[2] > 0 ? Math.max.apply(null, vs) : Math.min.apply(null, vs); });
   return best;
 }
-function cmpCtxText(){ return S.procs.length + (S.procs.length === 1 ? ' task' : ' tasks') + ', RR quantum ' + S.quantum + ', MLQ ' + mlqText() + ', MLFQ ' + mlfqText(); }
+function cmpCtxText(){ return S.procs.length + (S.procs.length === 1 ? ' task' : ' tasks') + ', RR quantum ' + S.quantum; }
 function buildCompare(){
   var res = compareRuns();
   var T = Math.max.apply(null, res.map(function(r){ return r.s.total; }).concat([1]));
@@ -1091,11 +913,7 @@ function launch(el, from, i){
     an.onfinish = an.oncancel = end;
   });
 }
-/* ready-tray caption: remaining ticks, or the live response ratio under HRRN */
-function readyText(i, sn, k){
-  if (S.algo === 'HRRN'){ var p = S.procs[i]; return 'ratio ' + ((k - p.arrival + p.burst) / p.burst).toFixed(2); }
-  return sn.rem[i] + ' left';
-}
+function readyText(i, sn){ return sn.rem[i] + ' left'; }
 function render(instant){
   var T = S.sim.total;
   var k = Math.min(T, Math.floor(S.t + 1e-6)), sn = S.sim.snap[k];
@@ -1107,7 +925,7 @@ function render(instant){
   S.lastK = k;
   var finishedNow = animate && k === T && prevK < T && T > 0;
   /* text-only updates */
-  sn.ready.forEach(function(i){ var el = tokens[i]; if (el) el.lastChild.textContent = readyText(i, sn, k); });
+  sn.ready.forEach(function(i){ var el = tokens[i]; if (el) el.lastChild.textContent = readyText(i, sn); });
   if (sig === S.sig){ cpuText(sn, k); return; }
   S.sig = sig;
 
@@ -1119,10 +937,9 @@ function render(instant){
   });
   if (S.run >= 0) old[S.run] = cookieRect;
 
-  var rt = $('ready'), dt = $('done'), lanesOn = isML(S.algo);
-  Array.prototype.slice.call(document.querySelectorAll('#readyZone .token, #done .token')).forEach(function(el){ el.remove(); });
-  sn.ready.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = readyText(i, sn, k); (lanesOn ? $('qtray' + laneOf(i, sn)) : rt).appendChild(el); });
-  if (lanesOn) laneState(sn);
+  var rt = $('ready'), dt = $('done');
+  Array.prototype.slice.call(document.querySelectorAll('#ready .token, #done .token')).forEach(function(el){ el.remove(); });
+  sn.ready.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = readyText(i, sn); rt.appendChild(el); });
   sn.done.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = 'at ' + S.sim.metrics[i].finish; dt.appendChild(el); });
   rt.firstChild.hidden = false;
   rt.querySelector('.hint').hidden = sn.ready.length > 0;
@@ -1178,45 +995,13 @@ function cpuView(sn, run, instant){
     $('cBig').style.color = '#18181B'; $('cSub').style.color = $('cQ').style.color = '#4E5259';
   }
 }
-/* ---------- MLQ queue lanes in the stage ---------- */
-/* which lane a task sits in at this moment: fixed for MLQ, from the snapshot for MLFQ */
-function laneOf(i, sn){
-  if (S.algo === 'MLFQ') return sn && sn.lvl ? sn.lvl[i] : 0;
-  return Math.min(S.mlq.n, S.procs[i].queue) - 1;
-}
-function buildLanes(){
-  var on = isML(S.algo), box = $('qlanes'), cfg = cfgFor(S.algo), nq = cfg.algos.length;
-  box.hidden = !on; $('ready').hidden = on;
-  $('readyLbl').textContent = on ? 'Ready queues' : 'Ready';
-  box.replaceChildren();
-  if (!on) return;
-  for (var qi = 0; qi < nq; qi++){
-    var a = cfg.algos[qi];
-    box.appendChild(h('div', {class: 'qlane', id: 'qlane' + qi},
-      h('div', {class: 'qh'}, h('span', null, 'Q' + (qi + 1) + (qi === 0 ? ' \u00b7 highest' : qi === nq - 1 ? ' \u00b7 lowest' : '')), laneControls(qi, nq)),
-      h('div', {class: 'qtray', id: 'qtray' + qi}, h('span', {class: 'hint'}, 'empty'))));
-  }
-}
-/* highlight the queue that owns the CPU; dim queues waiting behind a higher queue */
-function laneState(sn){
-  var nq = cfgFor(S.algo).algos.length, top = nq, rq = sn.run >= 0 ? laneOf(sn.run, sn) : -1;
-  sn.ready.concat(sn.run >= 0 ? [sn.run] : []).forEach(function(i){ top = Math.min(top, laneOf(i, sn)); });
-  for (var qi = 0; qi < nq; qi++){
-    var lane = $('qlane' + qi), tray = $('qtray' + qi), has = tray.querySelector('.token') !== null;
-    tray.querySelector('.hint').hidden = has;
-    lane.classList.toggle('on', qi === rq);
-    lane.classList.toggle('blocked', has && qi > top && qi !== rq);
-  }
-}
 function cpuText(sn, k){
   var run = sn.run, dots = $('dots');
   if (run >= 0){
     var b = S.procs[run].burst, left = sn.rem[run];
     $('cBig').textContent = S.procs[run].id;
     $('cSub').textContent = left + ' of ' + b + ' left';
-    var cf = isML(S.algo) ? cfgFor(S.algo) : null, ln = cf ? laneOf(run, sn) : 0;
-    var rr = S.algo === 'RR' ? S.quantum : cf && cf.algos[ln] === 'RR' ? cf.q[ln] : 0;
-    $('cQ').textContent = rr && sn.qu ? 'quantum ' + sn.qu + ' of ' + rr : '';
+    $('cQ').textContent = S.algo === 'RR' && sn.qu ? 'quantum ' + sn.qu + ' of ' + S.quantum : '';
     var nd = b <= 20 ? b : 0; /* long bursts: skip the dots, the text already says how much is left */
     if (dots.childNodes.length !== nd || dots.dataset.pid !== String(run)){ dots.replaceChildren(); dots.dataset.pid = run; for (var j = 0; j < nd; j++) dots.appendChild(h('i')); }
     for (var q = 0; q < nd; q++) dots.childNodes[q].className = q < b - left ? 'f' : '';
@@ -1272,7 +1057,7 @@ document.addEventListener('keydown', function(e){
   if (e.code === 'Space'){ e.preventDefault(); $('play').click(); }
   else if (e.code === 'ArrowRight'){ e.preventDefault(); stepBy(e.shiftKey ? 5 : 1); }
   else if (e.code === 'ArrowLeft'){ e.preventDefault(); stepBy(e.shiftKey ? -5 : -1); }
-  else if (/^[0-9]$/.test(e.key) && S.algo !== ALGOS[(+e.key + 9) % 10]){ pushUndo(); S.algo = ALGOS[(+e.key + 9) % 10]; say(''); buildAll(); } /* 1-9, then 0 = 10th tab */
+  else if (/^[1-5]$/.test(e.key) && S.algo !== ALGOS[+e.key - 1]){ pushUndo(); S.algo = ALGOS[+e.key - 1]; say(''); buildAll(); }
 });
 
 /* ---------- views ---------- */
@@ -1288,13 +1073,11 @@ Array.prototype.forEach.call($('viewTabs').children, function(b){
 });
 
 /* ---------- export ---------- */
-function fileBase(){ return 'SchedSim_' + S.algo + (S.algo !== 'FCFS' && S.algo !== 'RR' && S.algo !== 'HRRN' ? (S.preempt ? '_preemptive' : '_nonpreemptive') : ''); }
+function fileBase(){ return 'SchedSim_' + S.algo + (S.algo !== 'FCFS' && S.algo !== 'RR' ? (S.preempt ? '_preemptive' : '_nonpreemptive') : ''); }
 function modeText(){
   var t = S.algo;
-  if (S.algo !== 'FCFS' && S.algo !== 'RR' && S.algo !== 'HRRN') t += S.preempt ? ' (preemptive)' : ' (non-preemptive)';
+  if (S.algo !== 'FCFS' && S.algo !== 'RR') t += S.preempt ? ' (preemptive)' : ' (non-preemptive)';
   if (S.algo === 'RR') t += ', quantum ' + S.quantum;
-  if (S.algo === 'MLQ') t += ', ' + mlqText();
-  if (S.algo === 'MLFQ') t += ', ' + mlfqText();
   return t;
 }
 function download(blob, name){
@@ -1309,10 +1092,9 @@ function timeline(sim){
     .sort(function(a, b){ return a.start - b.start; });
 }
 function resultCols(){
-  var pri = S.algo === 'Priority' || (S.algo === 'MLQ' && mlqUsesPri());
+  var pri = S.algo === 'Priority';
   var c = [['Task', function(m){ return m.id; }], ['Arrival (AT)', function(m){ return m.arrival; }], ['Burst (BT)', function(m){ return m.burst; }]];
   if (pri) c.push(['Priority', function(m, k){ return S.procs[k].priority; }]);
-  if (S.algo === 'MLQ') c.push(['Queue', function(m, k){ return 'Q' + Math.min(S.mlq.n, S.procs[k].queue); }]);
   c.push(['Completion (CT)', function(m){ return m.finish; }], ['Turnaround (TAT)', function(m){ return m.turnaround; }],
     ['Waiting (WT)', function(m){ return m.waiting; }], ['Response (RT)', function(m){ return m.response; }]);
   return c;
@@ -1449,16 +1231,16 @@ function onCmpMove(e){
   if (!bar){ tip.hidden = true; return; }
   var pid = +bar.dataset.pid;
   var ca = S.cmpRes[+bar.dataset.ri].a;
-  showTip(e, pid, ca === 'Priority' || (ca === 'MLQ' && mlqUsesPri()), [[pid < 0 ? 'time' : 'runs', bar.dataset.s + '\u2013' + bar.dataset.e]], ca === 'MLQ');
+  showTip(e, pid, ca === 'Priority', [[pid < 0 ? 'time' : 'runs', bar.dataset.s + '\u2013' + bar.dataset.e]]);
 }
 /* fills and places the tooltip for task pid (-1 = idle); extra = [[label, value], ...] */
-function showTip(e, pid, showPri, extra, showQ){
+function showTip(e, pid, showPri, extra){
   tip.replaceChildren();
   if (pid < 0) tip.appendChild(h('b', null, 'CPU idle'));
   else {
     var p = S.procs[pid];
     tip.appendChild(h('b', null, 'Task ' + p.id));
-    extra = [['arrival', p.arrival], ['burst', p.burst]].concat(showPri ? [['priority', p.priority]] : [], showQ ? [['queue', 'Q' + Math.min(S.mlq.n, p.queue)]] : [], extra || []);
+    extra = [['arrival', p.arrival], ['burst', p.burst]].concat(showPri ? [['priority', p.priority]] : [], extra || []);
   }
   (extra || []).forEach(function(r){ tip.appendChild(h('div', null, h('span', null, (r[0] + '         ').slice(0, 9)), r[1])); });
   tip.hidden = false;
@@ -1470,17 +1252,17 @@ function showTip(e, pid, showPri, extra, showQ){
 function offCmp(){ setFocus(null); tip.hidden = true; }
 /* simulator hover: timetable bars, ready/done tokens and the CPU */
 $('simView').addEventListener('mousemove', function(e){
-  var el = e.target.closest('.bar, #readyZone .token, #done .token, #cookie'), pri = S.algo === 'Priority' || (S.algo === 'MLQ' && mlqUsesPri()), sq = S.algo === 'MLQ';
+  var el = e.target.closest('.bar, #ready .token, #done .token, #cookie'), pri = S.algo === 'Priority';
   if (!el){ tip.hidden = true; return; }
   if (el.id === 'cookie'){
     var k = Math.min(S.sim.total, Math.floor(S.t + 1e-6)), run = S.sim.snap[k].run;
     if (run < 0){ tip.hidden = true; return; }
-    showTip(e, run, pri, [['left', S.sim.snap[k].rem[run] + ' of ' + S.procs[run].burst]], sq);
+    showTip(e, run, pri, [['left', S.sim.snap[k].rem[run] + ' of ' + S.procs[run].burst]]);
   } else if (el.classList.contains('bar')){
-    showTip(e, +el.dataset.pid, pri, [[+el.dataset.pid < 0 ? 'time' : 'runs', el.dataset.s + '\u2013' + el.dataset.e]], sq);
+    showTip(e, +el.dataset.pid, pri, [[+el.dataset.pid < 0 ? 'time' : 'runs', el.dataset.s + '\u2013' + el.dataset.e]]);
   } else {
     var pid = +el.dataset.pid, m = S.sim.metrics[pid];
-    showTip(e, pid, pri, el.closest('#done') ? [['finished', m.finish], ['waited', m.waiting]] : [['status', el.lastChild.textContent]], sq);
+    showTip(e, pid, pri, el.closest('#done') ? [['finished', m.finish], ['waited', m.waiting]] : [['status', el.lastChild.textContent]]);
   }
 });
 $('simView').addEventListener('mouseleave', function(){ tip.hidden = true; });
@@ -1494,8 +1276,8 @@ function compareCSV(){
   rows.push(['Comparison', cmpCtxText()]);
   rows.push([]);
   rows.push(['Workload']);
-  rows.push(['Task', 'Arrival (AT)', 'Burst (BT)', 'Priority', 'MLQ queue']);
-  S.procs.forEach(function(p){ rows.push([p.id, p.arrival, p.burst, p.priority, 'Q' + Math.min(S.mlq.n, p.queue)]); });
+  rows.push(['Task', 'Arrival (AT)', 'Burst (BT)', 'Priority']);
+  S.procs.forEach(function(p){ rows.push([p.id, p.arrival, p.burst, p.priority]); });
   rows.push([]);
   rows.push(['Algorithm', 'Mode', 'Avg turnaround (TAT)', 'Avg waiting (WT)', 'Avg response (RT)', 'CPU utilization', 'Context switches', 'Total time']);
   res.forEach(function(r){ rows.push([r.a, r.mode, fmt(r.s.avg.turnaround), fmt(r.s.avg.waiting), fmt(r.s.avg.response), Math.round(r.s.util * 100) + '%', r.s.switches, r.s.total]); });
@@ -1522,14 +1304,14 @@ function compareCanvas(){
   y += 40;
   /* workload */
   txt('Workload', P, y, '600 15px ' + TXT, '#4E5259'); y += 22;
-  var wcols = ['Task', 'Arrival (AT)', 'Burst (BT)', 'Priority', 'MLQ queue'], wx = [P, P + 260, P + 420, P + 580, P + 740];
+  var wcols = ['Task', 'Arrival (AT)', 'Burst (BT)', 'Priority'], wx = [P, P + 260, P + 420, P + 580];
   wcols.forEach(function(t, j){ txt(t, wx[j] + (j ? 0 : 0), y + 14, '600 13px ' + TXT, '#4E5259', j ? 'right' : 'left'); });
   y += 30;
   S.procs.forEach(function(p, k){
     rule(y); var cy = y + ROW / 2;
     c.beginPath(); if (c.roundRect) c.roundRect(P, cy - 12, 40, 24, 12); else c.rect(P, cy - 12, 40, 24); c.fillStyle = COL[k]; c.fill();
     txt(p.id, P + 20, cy, '600 13px ' + MONO, INK[k], 'center');
-    [p.arrival, p.burst, p.priority, 'Q' + Math.min(S.mlq.n, p.queue)].forEach(function(v, j){ txt(v, wx[j + 1], cy, '400 15px ' + MONO, '#18181B', 'right'); });
+    [p.arrival, p.burst, p.priority].forEach(function(v, j){ txt(v, wx[j + 1], cy, '400 15px ' + MONO, '#18181B', 'right'); });
     y += ROW;
   });
   y += 44;
@@ -1614,9 +1396,9 @@ document.addEventListener('click', function(e){ if (!$('exportList').hidden && !
 document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !$('exportList').hidden){ setExportMenu(false); $('exportBtn').focus(); } });
 
 function recompute(){
-  S.sim = simulate(S.procs, S.algo, S.quantum, S.preempt, cfgFor(S.algo));
+  S.sim = simulate(S.procs, S.algo, S.quantum, S.preempt);
   S.t = Math.min(S.t, S.sim.total);
-  buildGantt(); buildMetrics(); buildLanes();
+  buildGantt(); buildMetrics();
   S.sig = ''; S.run = -2;
   Object.keys(tokens).forEach(function(i){ if (+i >= S.procs.length){ tokens[i].remove(); delete tokens[i]; } });
   paint(true);

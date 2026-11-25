@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SchedSim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Chivo+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#F1F4EE;
+  --surface:#FFFFFF;
+  --tray:#E2E7DC;
+  --rule:#EBEEE7;
+  --rule-2:#DDE2D6;
+  --ink:#18181B;
+  --muted:#4E5259;
+  --charcoal:#2B2B2E;
+  --on-dark:#D9DBDF;
+  --error:#B3261E;
+  --text:'Bricolage Grotesque','Segoe UI',Arial,sans-serif;
+  --mono:'Chivo Mono',Consolas,monospace;
+  --ease:cubic-bezier(.22,.8,.28,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{min-width:1180px;background:var(--ground);color:var(--ink);font-family:var(--text);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.wrap{max-width:1360px;margin:0 auto;padding:28px 40px 64px;display:flex;flex-direction:column;gap:32px}
+[hidden]{display:none!important}
+
+header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.logo{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.seg{display:flex;gap:4px;padding:4px;background:var(--tray);border-radius:999px}
+.tab{height:44px;padding:0 20px;border:0;border-radius:999px;background:transparent;font:600 15px var(--text);color:#3A3D44;transition:background .2s var(--ease),color .2s var(--ease)}
+.tab:hover:not(.on){background:#F1F4EEB3}
+.tab.on{background:var(--ink);color:#fff}
+#viewTabs .tab.on{background:var(--surface);color:var(--ink)}
+.tab.fill{background:var(--tray);flex:1}
+.tab.fill:hover{background:#D6DCCE}
+.tab:disabled{opacity:.45;cursor:default}
+
+.row{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}
+aside{flex:1 1 260px;max-width:280px;display:flex;flex-direction:column;gap:20px}
+h2{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em}
+h3{margin:0;font-size:22px;font-weight:800}
+.lbl{font:600 13px var(--text);color:var(--muted)}
+.stepper{display:flex;align-items:center;justify-content:space-between;padding:4px;background:var(--tray);border-radius:999px}
+.round{width:44px;height:44px;border:0;border-radius:50%;background:var(--tray);font:600 15px var(--mono);color:var(--ink)}
+.stepper .round{background:var(--surface)}
+.round:hover:not(:disabled){background:#F1F4EE}
+.round:disabled{opacity:.45;cursor:default}
+.count{font:600 18px var(--mono)}
+.wl{display:grid;grid-template-columns:56px 1fr 1fr;gap:10px;align-items:center}
+.wl.pri{grid-template-columns:56px 1fr 1fr 1fr}
+.wl .lbl.c{text-align:center}
+.token{display:inline-flex;align-items:center;gap:8px;padding:12px 18px;font:600 15px var(--mono);white-space:nowrap}
+.token small{font-weight:400;font-size:13px}
+.wl .token{padding:10px 0;justify-content:center}
+.num{width:100%;height:44px;border:2px solid transparent;border-radius:16px;background:var(--tray);text-align:center;font:600 16px var(--mono);color:var(--ink);-moz-appearance:textfield}
+.num::-webkit-inner-spin-button,.num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.num:focus{outline:none;background:var(--surface);border-color:var(--ink)}
+.pre .tab{flex:1;height:40px;padding:0 8px;font-size:13px}
+.quantum{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.quantum .num{width:84px}
+.note{min-height:20px;font-size:13px;color:var(--error)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btns .tab{height:44px;padding:0 10px;min-width:calc(50% - 4px)}
+
+.main{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:28px}
+.stage{position:relative;overflow:hidden;background:var(--surface);border-radius:56px 40px 64px 44px;padding:32px 40px 36px}
+.grain{position:absolute;right:-128px;top:-70px;width:380px;height:260px}
+.stagehead{position:relative;display:flex;justify-content:space-between;align-items:flex-start}
+.tread{color:#fff;text-align:center;width:190px;padding:14px 20px 18px;margin:-16px -42px 0 0;background:var(--charcoal);border-radius:56% 44% 52% 48% / 50% 46% 54% 50%}
+.tread b{display:block;font:600 72px/.9 var(--mono);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.tread span{font:400 14px var(--mono);color:var(--on-dark)}
+.zones{position:relative;z-index:2;display:grid;grid-template-columns:1fr 260px 1fr;gap:28px;align-items:center;margin-top:60px}
+.zone{display:flex;flex-direction:column;gap:12px;align-items:center}
+.zone .lbl{font-size:15px}
+.tray{width:100%;min-height:150px;background:var(--tray);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;padding:24px;position:relative}
+.tray.ready{border-radius:46% 54% 42% 58% / 58% 46% 54% 42%}
+.tray.done{border-radius:58% 42% 56% 44% / 44% 58% 42% 56%}
+.hint{position:absolute;font:400 13px var(--mono);color:var(--muted)}
+.cpu{display:flex;flex-direction:column;align-items:center;gap:10px}
+.cookie{position:relative;width:240px;height:240px}
+.cookie svg{position:absolute;inset:0;width:240px;height:240px}
+.cookie .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.cookie .big{font:600 84px/1 var(--mono);letter-spacing:-.04em;transition:color .2s var(--ease)}
+.cookie .sub{font:400 14px var(--mono);transition:color .2s var(--ease)}
+.dots{display:flex;gap:6px;min-height:14px;flex-wrap:wrap;justify-content:center;max-width:240px}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);display:block}
+.dots i.f{background:var(--ink)}
+.ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;margin:0}
+
+.card{background:var(--surface);border-radius:40px;padding:28px 32px 24px;display:flex;flex-direction:column;gap:16px}
+.tt{display:flex;gap:12px}
+.tt .names{width:32px;flex:none;display:flex;flex-direction:column}
+.tt .names div{height:48px;display:flex;align-items:center;justify-content:center;font:600 15px var(--mono)}
+.tt .names div.sp{height:32px}
+.plot{position:relative;flex:1;min-width:0}
+.ruler{position:relative;height:32px}
+.ruler span{position:absolute;top:4px;transform:translateX(-50%);font:400 12px var(--mono);color:var(--muted)}
+.lane{position:relative;height:48px;border-top:1px solid var(--rule)}
+.bar{position:absolute;top:8px;height:32px;border-radius:999px;border:2px solid;box-sizing:border-box;font:600 14px var(--mono);color:var(--ink)}
+.bar>div{position:absolute;inset:-2px;border-radius:999px;display:flex;align-items:center;justify-content:center}
+.bar>.f{clip-path:inset(0 100% 0 0)}
+.bar.run{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--ink)}
+.ph{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);pointer-events:none;z-index:5}
+.ph span{position:absolute;top:2px;left:0;margin-left:8px;padding:3px 10px;border-radius:999px;background:var(--ink);color:#fff;font:600 12px var(--mono);white-space:nowrap}
+.ph.flip span{margin-left:0;transform:translateX(calc(-100% - 8px))}
+.transport{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:8px}
+.transport .play{min-width:104px;background:var(--ink);color:#fff}
+.transport .play:hover{background:#34343A}
+.transport input[type=range]{flex:1 1 200px;accent-color:var(--ink)}
+.speed{display:flex;gap:2px;padding:3px;background:var(--tray);border-radius:999px}
+.speed .tab{height:40px;padding:0 14px}
+.speed .tab.on{background:var(--surface);color:var(--ink)}
+
+.mview{display:flex;flex-direction:column;gap:20px}
+.mrow{display:flex;gap:40px;align-items:stretch}
+.dark{flex:none;width:280px;background:var(--charcoal);color:#fff;border-radius:44px 32px 48px 36px;padding:28px 32px;display:flex;flex-direction:column;justify-content:space-between;gap:14px}
+.dark b{display:block;font:600 40px/1 var(--mono)}
+.dark b.s{font-size:26px}
+.dark span{font-size:14px;color:var(--on-dark)}
+.dark hr{border:0;border-top:1px solid #4a4a4e;margin:0}
+.tcard{flex:1;min-width:0;overflow-x:auto;background:var(--surface);border-radius:40px;padding:24px 28px}
+table{width:100%;border-collapse:collapse}
+th{font:600 13px var(--text);color:var(--muted);text-align:right;padding:0 12px 12px 0;white-space:nowrap}
+td{font:400 16px var(--mono);text-align:right;padding:14px 12px 14px 0;border-top:1px solid var(--rule-2);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+td .token{padding:6px 14px}
+.best{font-weight:600;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:2px}
+
+.ctx{font:400 13px var(--mono);color:var(--muted)}
+.strip{display:flex;align-items:center}
+.strip .name{width:80px;flex:none;font:600 15px var(--text)}
+.strip .lane{flex:1;border-top:1px solid var(--rule)}
+.cbar{position:absolute;top:8px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;font:600 13px var(--mono);overflow:hidden}
+.axis{display:flex}.axis .sp{width:80px;flex:none}.axis .ruler{flex:1}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <nav class="seg" id="algoTabs" aria-label="Scheduling algorithm"></nav>
+  <div class="seg" id="viewTabs" role="group" aria-label="View">
+    <button class="tab on" data-view="sim" aria-pressed="true">Simulator</button>
+    <button class="tab" data-view="cmp" aria-pressed="false">Compare</button>
+  </div>
+</header>
+
+<div class="row" id="simView">
+  <aside>
+    <h2>Workload</h2>
+    <div class="stepper" role="group" aria-label="Task count">
+      <button class="round" id="minus" aria-label="Remove task">&minus;</button>
+      <span class="count" id="count">5 tasks</span>
+      <button class="round" id="plus" aria-label="Add task">+</button>
+    </div>
+    <div class="wl" id="wl"></div>
+    <div class="quantum" id="qRow" hidden>
+      <label class="lbl" for="quantum">Time quantum</label>
+      <input class="num" id="quantum" type="number" min="1" max="9" value="2">
+    </div>
+    <div class="seg pre" id="preRow" role="group" aria-label="Preemption" hidden>
+      <button class="tab on" data-p="1" aria-pressed="true">Preemptive</button>
+      <button class="tab" data-p="0" aria-pressed="false">Non-preemptive</button>
+    </div>
+    <div class="note" id="note" role="status" aria-live="polite"></div>
+    <div class="btns">
+      <button class="tab fill" id="rand">Randomize</button>
+      <button class="tab fill" id="preset">Presets</button>
+      <button class="tab fill" id="undo" disabled>Undo</button>
+      <button class="tab fill" id="reset">Reset</button>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="stage">
+      <svg class="grain" aria-hidden="true" viewBox="0 0 400 400" preserveAspectRatio="none">
+        <defs><filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/><feColorMatrix in="n" type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.35"/></feComponentTransfer><feComposite in2="SourceGraphic" operator="in"/><feBlend in="SourceGraphic" mode="multiply"/></filter></defs>
+        <path id="grainBlob" fill="#2B2B2E" filter="url(#grainF)"/>
+      </svg>
+      <div class="stagehead">
+        <h2>Stage</h2>
+        <div class="tread"><b id="tRead">0</b><span>time t</span></div>
+      </div>
+      <div class="zones">
+        <div class="zone"><span class="lbl">Ready</span><div class="tray ready" id="ready"><span class="hint">nothing waiting</span></div></div>
+        <div class="cpu">
+          <span class="lbl" style="font-size:15px">CPU</span>
+          <div class="cookie" id="cookie">
+            <svg id="cookieSvg" role="img" aria-label="CPU idle" viewBox="0 0 240 240"><path id="cookiePath"/></svg>
+            <div class="in"><span class="big" id="cBig">&mdash;</span><span class="sub" id="cSub">idle</span></div>
+          </div>
+          <div class="dots" id="dots" aria-hidden="true"></div>
+        </div>
+        <div class="zone"><span class="lbl">Done</span><div class="tray done" id="done"><span class="hint">nothing finished</span></div></div>
+      </div>
+      <div class="lbl" id="live" role="status" aria-live="polite" style="position:absolute;left:-9999px">&nbsp;</div>
+    </div>
+
+    <div class="card">
+      <h3>Timetable</h3>
+      <div class="tt">
+        <div class="names" id="names"></div>
+        <div class="plot" id="plot">
+          <div class="ruler" id="ruler"></div>
+          <div id="lanes"></div>
+          <div class="ph" id="ph"><span id="phLbl">t = 0</span></div>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="tab play" id="play">Play</button>
+        <button class="round" id="back" aria-label="Step back one tick">&minus;1</button>
+        <button class="round" id="fwd" aria-label="Step forward one tick">+1</button>
+        <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" aria-label="Scrub time">
+        <div class="speed" id="speed" role="group" aria-label="Speed">
+          <button class="tab" data-s="0.5">0.5&times;</button>
+          <button class="tab on" data-s="1">1&times;</button>
+          <button class="tab" data-s="2">2&times;</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<section id="metricsView" class="mview">
+  <h2>Metrics</h2>
+  <div class="mrow">
+    <div class="dark" id="dark"></div>
+    <div class="tcard"><table id="mtable"></table></div>
+  </div>
+</section>
+
+<section id="cmpView" hidden style="display:flex;flex-direction:column;gap:28px">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h3>Compare</h3><span class="ctx" id="cmpCtx"></span></div>
+    <div class="axis"><div class="sp"></div><div class="ruler" id="cRuler"></div></div>
+    <div id="strips"></div>
+  </div>
+  <div class="tcard" style="flex:none"><table id="ctable"></table></div>
+</section>
+
+</div>
+
+<script>
+/*ENGINE_START*/
+function simulate(procs, algo, quantum, preemptive){
+  var n = procs.length, i;
+  if (preemptive === false) quantum = Infinity;
+  var rem = procs.map(function(p){return p.burst;});
+  var arrival = procs.map(function(p){return p.arrival;});
+  var burst = procs.map(function(p){return p.burst;});
+  var pri = procs.map(function(p){return p.priority;});
+  var finish = [], first = [], isDone = [];
+  for (i = 0; i < n; i++){ finish.push(0); first.push(-1); isDone.push(false); }
+  var ticks = [], snap = [];
+  var queue = [], cur = -1, qUsed = 0, doneCount = 0, t = 0;
+  function cmp(a, b){ for (var j = 0; j < a.length; j++){ if (a[j] < b[j]) return -1; if (a[j] > b[j]) return 1; } return 0; }
+  function key(j){
+    if (algo === 'SJF') return [burst[j], arrival[j], j];
+    if (algo === 'SRTF') return [rem[j], arrival[j], j];
+    if (algo === 'Priority') return [pri[j], arrival[j], j];
+    return [arrival[j], j];
+  }
+  function cands(){ var o = []; for (var j = 0; j < n; j++) if (!isDone[j] && arrival[j] <= t) o.push(j); return o; }
+  function enqueueArrivals(){ for (var j = 0; j < n; j++) if (arrival[j] === t) queue.push(j); }
+  if (n === 0) return {segments:[], ticks:[], snap:[{run:-1,ready:[],done:[],rem:[]}], metrics:[], avg:{turnaround:0,waiting:0,response:0}, total:0, util:0, switches:0};
+  enqueueArrivals();
+  while (doneCount < n && t < 5000){
+    var next = -1, preempt = false, list, j;
+    if (algo === 'RR'){
+      if (cur !== -1 && qUsed < quantum) next = cur;
+      else if (queue.length) next = queue.shift();
+    } else if (algo === 'FCFS' || algo === 'SJF' || (algo === 'Priority' && preemptive === false)){
+      if (cur !== -1) next = cur;
+      else { list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0]; }
+    } else {
+      list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0];
+    }
+    var ready;
+    if (algo === 'RR') ready = queue.slice();
+    else { ready = cands().filter(function(x){ return x !== next; }); ready.sort(function(a, b){ return cmp(key(a), key(b)); }); }
+    snap.push({run: next, ready: ready, rem: rem.slice()});
+    ticks.push(next);
+    if (next === -1){ cur = -1; qUsed = 0; }
+    else {
+      if (first[next] === -1) first[next] = t;
+      rem[next]--; qUsed++;
+      if (rem[next] === 0){ isDone[next] = true; finish[next] = t + 1; doneCount++; cur = -1; qUsed = 0; }
+      else if (algo === 'RR' && qUsed >= quantum){ preempt = true; cur = -1; qUsed = 0; }
+      else cur = next;
+    }
+    t++;
+    if (algo === 'RR'){ enqueueArrivals(); if (preempt) queue.push(next); }
+  }
+  var total = ticks.length;
+  snap.push({run: -1, ready: [], rem: rem.slice()});
+  for (i = 0; i <= total; i++){
+    var d = [];
+    for (j = 0; j < n; j++) if (finish[j] > 0 && finish[j] <= i) d.push(j);
+    d.sort(function(a, b){ return finish[a] - finish[b] || a - b; });
+    snap[i].done = d;
+  }
+  var segments = [];
+  for (i = 0; i < total; i++){
+    if (ticks[i] === -1) continue;
+    var last = segments[segments.length - 1];
+    if (last && last.pid === ticks[i] && last.end === i) last.end = i + 1;
+    else segments.push({pid: ticks[i], start: i, end: i + 1});
+  }
+  var switches = 0, busy = 0;
+  for (i = 1; i < segments.length; i++) if (segments[i].pid !== segments[i - 1].pid) switches++;
+  for (i = 0; i < total; i++) if (ticks[i] !== -1) busy++;
+  var metrics = procs.map(function(p, k){
+    return {id: p.id, arrival: p.arrival, burst: p.burst, finish: finish[k],
+      turnaround: finish[k] - p.arrival, waiting: finish[k] - p.arrival - p.burst, response: first[k] - p.arrival};
+  });
+  function avg(f){ return metrics.reduce(function(s, m){ return s + m[f]; }, 0) / n; }
+  return {segments: segments, ticks: ticks, snap: snap, metrics: metrics,
+    avg: {turnaround: avg('turnaround'), waiting: avg('waiting'), response: avg('response')},
+    total: total, util: total ? busy / total : 0, switches: switches};
+}
+/*ENGINE_END*/
+</script>
+
+<script>
+(function(){
+'use strict';
+var ALGOS = ['FCFS','SJF','SRTF','RR','Priority'];
+var MAXT = 6, LETTERS = 'ABCDEF';
+var COL = ['#3F63F2','#FFC93C','#FF4F2E','#2B2B2E','#B9A8FF','#4FD1A5'];
+var INK = ['#FFFFFF','#18181B','#18181B','#FFFFFF','#18181B','#18181B'];
+var SHAPE = ['48% 52% 44% 56% / 56% 46% 54% 44%','56% 44% 52% 48% / 44% 56% 46% 54%','44% 56% 58% 42% / 52% 44% 56% 48%','52% 48% 46% 54% / 46% 54% 48% 52%','58% 42% 50% 50% / 54% 48% 52% 46%','50% 50% 54% 46% / 48% 52% 46% 54%'];
+var LOBES = [9,7,8,6,10,5];
+var DEFAULT = [[0,5,2],[1,3,1],[2,6,3],[4,2,2],[6,4,1]];
+var PRESETS = [
+  [[0,7,3],[2,2,1],[3,4,2],[8,3,1]],
+  [[0,2,2],[0,1,1],[0,8,3],[5,4,2],[5,2,1]],
+  [[0,6,1],[4,5,2],[8,3,3],[12,4,1],[13,2,2],[15,3,3]]
+];
+function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arrival: r[0], burst: r[1], priority: r[2]}; }); }
+
+var S = {algo:'SRTF', quantum:2, preempt:true, procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
+
+function $(id){ return document.getElementById(id); }
+function h(tag, attrs){
+  var e = document.createElement(tag), k;
+  for (k in (attrs || {})){
+    var v = attrs[k];
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  (function add(list){
+    for (var i = 0; i < list.length; i++){
+      var c = list[i];
+      if (c == null) continue;
+      if (Array.isArray(c)) add(c);
+      else e.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c)));
+    }
+  })(Array.prototype.slice.call(arguments, 2));
+  return e;
+}
+function reduced(){ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function say(m){ $('note').textContent = m || ''; }
+function fmt(n){ return (Math.round(n * 10) / 10).toFixed(1); }
+function tokenStyle(i){ return 'background:' + COL[i] + ';color:' + INK[i] + ';border-radius:' + SHAPE[i]; }
+
+/* ---------- history ---------- */
+function snapshot(){ return {procs: S.procs.map(function(p){ return Object.assign({}, p); }), algo: S.algo, quantum: S.quantum, preempt: S.preempt}; }
+function pushUndo(){ S.undo.push(snapshot()); if (S.undo.length > 40) S.undo.shift(); $('undo').disabled = false; }
+function undo(){
+  var s = S.undo.pop();
+  if (!s){ say('Nothing to undo.'); return; }
+  S.procs = s.procs; S.algo = s.algo; S.quantum = s.quantum; S.preempt = s.preempt;
+  $('undo').disabled = !S.undo.length;
+  say('Undone.'); buildAll();
+}
+
+/* ---------- shapes ---------- */
+var N = 180, CX = 120, CY = 120, R = 104;
+function radii(lobes, amp){ var r = new Array(N); for (var j = 0; j < N; j++) r[j] = 1 + amp * Math.cos(lobes * j / N * 2 * Math.PI); return r; }
+function pathOf(r, cx, cy, rad){
+  var d = '';
+  for (var j = 0; j < N; j++){ var a = j / N * 2 * Math.PI, q = rad * r[j]; d += (j ? 'L' : 'M') + (cx + q * Math.cos(a)).toFixed(1) + ' ' + (cy + q * Math.sin(a)).toFixed(1); }
+  return d + 'Z';
+}
+function hex(c){ return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
+var grain = new Array(N);
+for (var gi = 0; gi < N; gi++){ var ga = gi / N * 2 * Math.PI; grain[gi] = 1 + .15 * Math.sin(2 * ga + .5) + .09 * Math.cos(3 * ga + 1.8) + .04 * Math.sin(5 * ga); }
+$('grainBlob').setAttribute('d', pathOf(grain, 200, 200, 160));
+
+var cur = {r: radii(0, 0), c: hex('#E2E7DC')}, tween = 0;
+/* fluid motion: travelling harmonics + slow spin, only while playing */
+var W = {amp: 0, target: 0, time: 0, raf: 0, last: 0};
+var wobbled = new Array(N);
+function drawCookie(){
+  var p = $('cookiePath'), r = cur.r;
+  if (W.amp > .002){
+    var tt = W.time, a1 = W.amp * (.035 + .02 * Math.sin(tt * .9)), a2 = W.amp * (.03 + .015 * Math.cos(tt * 1.3));
+    for (var j = 0; j < N; j++){
+      var a = j / N * 2 * Math.PI;
+      wobbled[j] = r[j] + a1 * Math.cos(3 * a + tt * 2.2) + a2 * Math.cos(5 * a - tt * 1.7);
+    }
+    r = wobbled;
+    p.setAttribute('transform', 'rotate(' + (W.amp * tt * 14 % 360).toFixed(1) + ' 120 120)');
+  } else p.removeAttribute('transform');
+  p.setAttribute('d', pathOf(r, CX, CY, R));
+  p.setAttribute('fill', 'rgb(' + cur.c.map(Math.round).join(',') + ')');
+}
+function wobbleLoop(now){
+  var dt = W.last ? Math.min(.05, (now - W.last) / 1000) : 0; W.last = now;
+  W.time += dt;
+  W.amp += (W.target - W.amp) * Math.min(1, dt * 4);
+  if (Math.abs(W.target - W.amp) < .003) W.amp = W.target;
+  drawCookie();
+  if (W.amp > 0 || W.target > 0) W.raf = requestAnimationFrame(wobbleLoop); else W.raf = 0;
+}
+function setWobble(on){
+  W.target = on && !reduced() ? 1 : 0;
+  if (!W.raf && (W.target > 0 || W.amp > 0)){ W.last = 0; W.raf = requestAnimationFrame(wobbleLoop); }
+}
+function morphTo(tr, tc){
+  cancelAnimationFrame(tween);
+  if (reduced()){ cur = {r: tr, c: tc}; drawCookie(); return; }
+  var fr = cur.r.slice(), fc = cur.c.slice(), t0 = performance.now(), dur = 340;
+  (function f(now){
+    var p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3), j;
+    for (j = 0; j < N; j++) cur.r[j] = fr[j] + (tr[j] - fr[j]) * e;
+    for (j = 0; j < 3; j++) cur.c[j] = fc[j] + (tc[j] - fc[j]) * e;
+    drawCookie();
+    if (p < 1) tween = requestAnimationFrame(f);
+  })(t0);
+}
+
+/* ---------- header / setup ---------- */
+function buildTabs(){
+  var nav = $('algoTabs'); nav.replaceChildren();
+  ALGOS.forEach(function(a){
+    nav.appendChild(h('button', {class: 'tab' + (a === S.algo ? ' on' : ''), 'aria-pressed': a === S.algo, onclick: function(){
+      if (a === S.algo) return;
+      pushUndo(); S.algo = a; say(''); buildAll();
+    }}, a));
+  });
+  $('preRow').hidden = S.algo !== 'RR' && S.algo !== 'Priority';
+  Array.prototype.forEach.call($('preRow').children, function(b){
+    var on = (b.dataset.p === '1') === S.preempt;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+  });
+  $('qRow').hidden = S.algo !== 'RR' || !S.preempt;
+  $('quantum').value = S.quantum;
+}
+function buildWorkload(){
+  var g = $('wl'), pri = S.algo === 'Priority';
+  g.className = 'wl' + (pri ? ' pri' : '');
+  g.replaceChildren(h('span', {class: 'lbl'}, 'Task'), h('span', {class: 'lbl c'}, 'Arrival'), h('span', {class: 'lbl c'}, 'Burst'));
+  if (pri) g.appendChild(h('span', {class: 'lbl c'}, 'Priority'));
+  S.procs.forEach(function(p, i){
+    g.appendChild(h('span', {class: 'token', 'data-pill': i, style: tokenStyle(i)}, p.id));
+    g.appendChild(numInput(i, 'arrival', 'Arrival', 0, 20));
+    g.appendChild(numInput(i, 'burst', 'Burst', 1, 12));
+    if (pri) g.appendChild(numInput(i, 'priority', 'Priority', 1, 9));
+  });
+  $('count').textContent = S.procs.length + (S.procs.length === 1 ? ' task' : ' tasks');
+  $('plus').disabled = S.procs.length >= MAXT;
+  $('minus').disabled = S.procs.length <= 1;
+}
+function numInput(i, f, label, lo, hi){
+  return h('input', {class: 'num', type: 'number', min: lo, max: hi, value: S.procs[i][f], 'aria-label': label + ' for task ' + S.procs[i].id, onchange: function(){
+    var v = parseInt(this.value, 10), msg = '';
+    if (isNaN(v)){ v = S.procs[i][f]; msg = 'Enter a whole number.'; }
+    else if (v < lo){ v = lo; msg = label + ' is at least ' + lo + '.'; }
+    else if (v > hi){ v = hi; msg = label + ' is at most ' + hi + '.'; }
+    this.value = v; say(msg);
+    if (v === S.procs[i][f]) return;
+    pushUndo(); S.procs[i][f] = v; recompute();
+  }});
+}
+$('plus').addEventListener('click', function(){
+  if (S.procs.length >= MAXT){ say('Six tasks is the maximum.'); return; }
+  pushUndo();
+  var i = S.procs.length;
+  S.procs.push({id: LETTERS[i], arrival: Math.min(20, i * 2), burst: 3, priority: (i % 3) + 1});
+  say(''); buildWorkload(); recompute();
+});
+$('minus').addEventListener('click', function(){
+  if (S.procs.length <= 1){ say('Keep at least one task.'); return; }
+  pushUndo(); S.procs.pop(); say(''); buildWorkload(); recompute();
+});
+Array.prototype.forEach.call($('preRow').children, function(b){
+  b.addEventListener('click', function(){
+    var p = b.dataset.p === '1';
+    if (p === S.preempt) return;
+    pushUndo(); S.preempt = p; say(''); buildTabs(); recompute();
+  });
+});
+$('quantum').addEventListener('change', function(){
+  var v = parseInt(this.value, 10), msg = '';
+  if (isNaN(v) || v < 1){ v = 1; msg = 'Quantum is at least 1.'; } else if (v > 9){ v = 9; msg = 'Quantum is at most 9.'; }
+  this.value = v; say(msg);
+  if (v === S.quantum) return;
+  pushUndo(); S.quantum = v; recompute();
+});
+$('rand').addEventListener('click', function(){
+  pushUndo();
+  var c = 3 + Math.floor(Math.random() * 4), i, rows = [];
+  for (i = 0; i < c; i++) rows.push([Math.floor(Math.random() * 9), 1 + Math.floor(Math.random() * 7), 1 + Math.floor(Math.random() * 4)]);
+  S.procs = mk(rows); say(''); buildWorkload(); recompute();
+});
+$('preset').addEventListener('click', function(){
+  pushUndo(); S.preset = (S.preset + 1) % PRESETS.length;
+  S.procs = mk(PRESETS[S.preset]); say('Preset ' + (S.preset + 1) + ' of ' + PRESETS.length + '.'); buildWorkload(); recompute();
+});
+$('reset').addEventListener('click', function(){
+  pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.preempt = true; S.preset = -1; say(''); buildAll();
+});
+$('undo').addEventListener('click', undo);
+
+/* ---------- timetable ---------- */
+var bars = [];
+function tickStep(T){ return T <= 14 ? 1 : T <= 30 ? 2 : T <= 70 ? 5 : 10; }
+function rulerInto(el, T){
+  el.replaceChildren();
+  var st = tickStep(T);
+  for (var i = 0; i <= T; i += st) el.appendChild(h('span', {style: 'left:' + (i / T * 100) + '%'}, i));
+}
+function buildGantt(){
+  var T = Math.max(1, S.sim.total);
+  rulerInto($('ruler'), T);
+  var names = $('names'), lanes = $('lanes');
+  names.replaceChildren(h('div', {class: 'sp'}));
+  lanes.replaceChildren(); bars = [];
+  S.procs.forEach(function(p, i){
+    names.appendChild(h('div', null, p.id));
+    var lane = h('div', {class: 'lane'});
+    S.sim.segments.filter(function(s){ return s.pid === i; }).forEach(function(s){
+      var f = h('div', {class: 'f', style: 'background:' + COL[i] + ';color:' + INK[i]}, p.id);
+      var bar = h('div', {class: 'bar', style: 'left:' + (s.start / T * 100) + '%;width:calc(' + ((s.end - s.start) / T * 100) + '% - 4px);border-color:' + COL[i]},
+        h('div', null, p.id), f);
+      lane.appendChild(bar);
+      bars.push({el: bar, f: f, s: s, p: -1, run: false});
+    });
+    lanes.appendChild(lane);
+  });
+  $('scrub').max = T;
+}
+function updateGantt(){
+  var T = Math.max(1, S.sim.total), t = S.t;
+  bars.forEach(function(b){
+    var p = Math.max(0, Math.min(1, (t - b.s.start) / (b.s.end - b.s.start)));
+    if (p !== b.p){ b.p = p; b.f.style.clipPath = 'inset(0 ' + ((1 - p) * 100) + '% 0 0)'; }
+    var run = t >= b.s.start && t < b.s.end;
+    if (run !== b.run){ b.run = run; b.el.classList.toggle('run', run); }
+  });
+  var ph = $('ph'), pos = t / T;
+  ph.style.left = (pos * 100) + '%';
+  ph.classList.toggle('flip', pos > .85);
+  $('phLbl').textContent = 't = ' + Math.floor(t + 1e-6);
+  $('scrub').value = t;
+}
+
+/* ---------- metrics ---------- */
+function buildMetrics(){
+  var s = S.sim, a = s.avg;
+  var d = $('dark'); d.replaceChildren();
+  [[fmt(a.turnaround), 'avg turnaround'], [fmt(a.waiting), 'avg waiting'], [fmt(a.response), 'avg response']].forEach(function(r){
+    d.appendChild(h('div', null, h('b', null, r[0]), h('span', null, r[1])));
+  });
+  d.appendChild(h('hr'));
+  d.appendChild(h('div', null, h('b', {class: 's'}, Math.round(s.util * 100) + '%'), h('span', null, 'CPU busy')));
+  d.appendChild(h('div', null, h('b', {class: 's'}, s.switches), h('span', null, 'context switches')));
+  var tb = $('mtable'); tb.replaceChildren();
+  tb.appendChild(h('thead', null, h('tr', null, ['Task', 'Arrival', 'Burst', 'Finish', 'Turnaround', 'Waiting', 'Response'].map(function(x){ return h('th', null, x); }))));
+  var body = h('tbody');
+  s.metrics.forEach(function(m, i){
+    body.appendChild(h('tr', null, h('td', null, h('span', {class: 'token', style: tokenStyle(i)}, m.id)),
+      h('td', null, m.arrival), h('td', null, m.burst), h('td', null, m.finish), h('td', null, m.turnaround), h('td', null, m.waiting), h('td', null, m.response)));
+  });
+  tb.appendChild(body);
+}
+
+/* ---------- compare ---------- */
+function buildCompare(){
+  var res = ALGOS.map(function(a){ return {a: a, s: simulate(S.procs, a, S.quantum, S.preempt)}; });
+  var T = Math.max.apply(null, res.map(function(r){ return r.s.total; }).concat([1]));
+  $('cmpCtx').textContent = S.procs.length + ' tasks' + (S.algo === 'Priority' ? ', priorities set' : '') + ', quantum ' + S.quantum + (S.preempt ? '' : ', RR and Priority non-preemptive');
+  rulerInto($('cRuler'), T);
+  var strips = $('strips'); strips.replaceChildren();
+  res.forEach(function(r){
+    var lane = h('div', {class: 'lane'});
+    r.s.segments.forEach(function(g){
+      lane.appendChild(h('div', {class: 'cbar', style: 'left:' + (g.start / T * 100) + '%;width:calc(' + ((g.end - g.start) / T * 100) + '% - 4px);background:' + COL[g.pid] + ';color:' + INK[g.pid]}, S.procs[g.pid].id));
+    });
+    strips.appendChild(h('div', {class: 'strip'}, h('div', {class: 'name'}, r.a), lane));
+  });
+  var cols = [['turnaround', 'Avg turnaround', -1], ['waiting', 'Avg waiting', -1], ['response', 'Avg response', -1], ['util', 'CPU busy', 1], ['switches', 'Switches', -1]];
+  function val(r, k){ return k === 'util' ? r.s.util : k === 'switches' ? r.s.switches : r.s.avg[k]; }
+  var best = {};
+  cols.forEach(function(c){ var vs = res.map(function(r){ return val(r, c[0]); }); best[c[0]] = c[2] > 0 ? Math.max.apply(null, vs) : Math.min.apply(null, vs); });
+  var tb = $('ctable'); tb.replaceChildren();
+  tb.appendChild(h('thead', null, h('tr', null, h('th', null, 'Algorithm'), cols.map(function(c){ return h('th', null, c[1]); }))));
+  var body = h('tbody');
+  res.forEach(function(r){
+    body.appendChild(h('tr', null, h('td', {style: 'font-family:var(--text);font-weight:600'}, r.a), cols.map(function(c){
+      var v = val(r, c[0]), txt = c[0] === 'util' ? Math.round(v * 100) + '%' : c[0] === 'switches' ? v : fmt(v);
+      return h('td', {class: Math.abs(v - best[c[0]]) < 1e-9 ? 'best' : ''}, txt);
+    })));
+  });
+  tb.appendChild(body);
+}
+
+/* ---------- stage ---------- */
+var tokens = {};
+function getToken(i){
+  if (!tokens[i]) tokens[i] = h('span', {class: 'token', style: tokenStyle(i)}, h('span', {class: 't'}, S.procs[i].id), h('small'));
+  return tokens[i];
+}
+function rectOf(el){ var r = el.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; }
+function squash(el, delay){
+  el.animate([{transform: 'scale(1)'}, {transform: 'scale(1.1,.9)', offset: .45}, {transform: 'scale(1)'}], {duration: 220, delay: delay || 0, easing: 'ease-out'});
+}
+function fly(el, from){
+  var to = rectOf(el), dx = from.x - to.x, dy = from.y - to.y;
+  if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+  var a = el.animate([{transform: 'translate(' + dx + 'px,' + dy + 'px)'}, {transform: 'none'}], {duration: 300, easing: 'cubic-bezier(.22,.8,.28,1)'});
+  a.onfinish = function(){ squash(el); };
+}
+/* workload pill -> ready tray: a drop of paint is flung, hits the tray and splatters; the token condenses out of the splat */
+var SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs){ var e = document.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function splatPath(rad){
+  var ph = [Math.random() * 6, Math.random() * 6, Math.random() * 6], r = new Array(N);
+  for (var j = 0; j < N; j++){ var a = j / N * 2 * Math.PI; r[j] = 1 + .16 * Math.sin(3 * a + ph[0]) + .11 * Math.cos(5 * a + ph[1]) + .07 * Math.sin(7 * a + ph[2]); }
+  return pathOf(r, 0, 0, rad);
+}
+function launch(el, from, i){
+  var to = rectOf(el), dx = to.x - from.x, dy = to.y - from.y, ang = Math.atan2(dy, dx), col = COL[i];
+  var FLIGHT = 300;
+  /* token stays hidden, then condenses */
+  el.animate([
+    {transform: 'scale(.3)', opacity: 0, offset: 0},
+    {transform: 'scale(.3)', opacity: 0, offset: .42},
+    {transform: 'scale(1.14,.86)', opacity: 1, offset: .66, easing: 'ease-out'},
+    {transform: 'scale(1)', opacity: 1, offset: 1, easing: 'ease-out'}
+  ], {duration: 720, easing: 'linear'});
+  /* the flung drop */
+  var drop = h('span', {class: 'ghost', style: 'width:20px;height:20px;border-radius:50%;background:' + col + ';left:' + (from.x - 10) + 'px;top:' + (from.y - 10) + 'px'});
+  document.body.appendChild(drop);
+  var da = drop.animate([
+    {transform: 'translate(0,0) rotate(' + ang + 'rad) scale(.7,.7)'},
+    {transform: 'translate(' + dx * .55 + 'px,' + (dy * .55 - 36) + 'px) rotate(' + ang + 'rad) scale(1.9,.7)', offset: .5},
+    {transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + ang + 'rad) scale(2.2,.6)'}
+  ], {duration: FLIGHT, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards'});
+  da.onfinish = da.oncancel = function(){ drop.remove(); };
+  /* the splat */
+  var size = 220, svg = svgEl('svg', {class: 'ghost', width: size, height: size, viewBox: '-110 -110 220 220'});
+  svg.style.left = (to.x - size / 2) + 'px'; svg.style.top = (to.y - size / 2) + 'px'; svg.style.overflow = 'visible';
+  var blob = svgEl('path', {d: splatPath(Math.max(34, to.w * .48)), fill: col});
+  svg.appendChild(blob);
+  var spots = [];
+  var n = 8 + Math.floor(Math.random() * 4);
+  for (var k = 0; k < n; k++){
+    var a = ang + Math.PI + (Math.random() - .5) * 2.6 + (k % 3 === 0 ? Math.PI * .6 * (Math.random() - .5) : 0);
+    var dist = 46 + Math.random() * 56, rr = 2.5 + Math.random() * 6.5;
+    var c = svgEl('circle', {r: rr, fill: col, cx: 0, cy: 0}); svg.appendChild(c); spots.push({c: c, a: a, d: dist});
+  }
+  document.body.appendChild(svg);
+  var alive = n + 1;
+  function end(){ if (--alive === 0) svg.remove(); }
+  var b = blob.animate([
+    {transform: 'scale(.25,.2)', opacity: 1},
+    {transform: 'scale(1.18,.9)', opacity: 1, offset: .22, easing: 'ease-out'},
+    {transform: 'scale(1,1)', opacity: 1, offset: .6},
+    {transform: 'scale(1.04)', opacity: 0}
+  ], {duration: 820, delay: FLIGHT - 20, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards'});
+  b.onfinish = b.oncancel = end;
+  spots.forEach(function(s){
+    var x = Math.cos(s.a) * s.d, y = Math.sin(s.a) * s.d;
+    var an = s.c.animate([
+      {transform: 'translate(0,0) scale(.3)', opacity: 1},
+      {transform: 'translate(' + x + 'px,' + y + 'px) scale(1)', opacity: 1, offset: .55, easing: 'cubic-bezier(.1,.7,.3,1)'},
+      {transform: 'translate(' + x * 1.12 + 'px,' + (y * 1.12 + 6) + 'px) scale(.7)', opacity: 0}
+    ], {duration: 560 + Math.random() * 260, delay: FLIGHT - 20, easing: 'linear', fill: 'backwards'});
+    an.onfinish = an.oncancel = end;
+  });
+}
+function render(instant){
+  var T = S.sim.total;
+  var k = Math.min(T, Math.floor(S.t + 1e-6)), sn = S.sim.snap[k];
+  $('tRead').textContent = k;
+  var run = sn.run;
+  var sig = run + '|' + sn.ready.join() + '|' + sn.done.join();
+  var prevK = S.lastK === undefined ? k : S.lastK;
+  var animate = !instant && !reduced() && Math.abs(k - prevK) <= 1;
+  S.lastK = k;
+  var finishedNow = animate && k === T && prevK < T && T > 0;
+  /* text-only updates */
+  sn.ready.forEach(function(i){ var el = tokens[i]; if (el) el.lastChild.textContent = sn.rem[i] + ' left'; });
+  if (sig === S.sig){ cpuText(sn, k); return; }
+  S.sig = sig;
+
+  var old = {}, cookieRect = rectOf($('cookie'));
+  Object.keys(tokens).forEach(function(i){
+    var el = tokens[i];
+    el.getAnimations().forEach(function(a){ a.cancel(); });
+    if (el.isConnected) old[i] = rectOf(el);
+  });
+  if (S.run >= 0) old[S.run] = cookieRect;
+
+  var rt = $('ready'), dt = $('done');
+  Array.prototype.slice.call(rt.querySelectorAll('.token')).concat(Array.prototype.slice.call(dt.querySelectorAll('.token'))).forEach(function(el){ el.remove(); });
+  sn.ready.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = sn.rem[i] + ' left'; rt.appendChild(el); });
+  sn.done.forEach(function(i){ var el = getToken(i); el.lastChild.textContent = 'at ' + S.sim.metrics[i].finish; dt.appendChild(el); });
+  rt.firstChild.hidden = false;
+  rt.querySelector('.hint').hidden = sn.ready.length > 0;
+  dt.querySelector('.hint').hidden = sn.done.length > 0;
+
+  var prev = S.run;
+  if (animate){
+    var shown = sn.ready.concat(sn.done);
+    shown.forEach(function(i){
+      var from = old[i];
+      if (!from){
+        var pill = document.querySelector('[data-pill="' + i + '"]');
+        if (pill) launch(tokens[i], rectOf(pill), i);
+      } else fly(tokens[i], from);
+    });
+    if (run >= 0 && run !== prev && old[run] && !(run === prev)){
+      ghost(run, old[run], cookieRect);
+      squash($('cookie'), 200);
+    }
+  }
+  S.run = run;
+  cpuView(sn, run, instant);
+  cpuText(sn, k);
+  if (finishedNow) celebrate(sn);
+}
+/* all tasks done: finished tokens hop in a wave */
+function celebrate(sn){
+  sn.done.forEach(function(i, n){
+    var el = tokens[i]; if (!el) return;
+    el.animate([
+      {transform: 'translateY(0) scale(1)'},
+      {transform: 'translateY(-20px) scale(.92,1.1)', offset: .4, easing: 'ease-out'},
+      {transform: 'translateY(0) scale(1.14,.86)', offset: .75, easing: 'ease-in'},
+      {transform: 'translateY(0) scale(1)'}
+    ], {duration: 520, delay: n * 110, easing: 'ease-out'});
+  });
+}
+function ghost(i, from, to){
+  var g = h('span', {class: 'token ghost', style: tokenStyle(i)}, S.procs[i].id);
+  g.style.left = (from.x - from.w / 2) + 'px'; g.style.top = (from.y - from.h / 2) + 'px';
+  document.body.appendChild(g);
+  var a = g.animate([{transform: 'translate(0,0) scale(1)', opacity: 1}, {transform: 'translate(' + (to.x - from.x) + 'px,' + (to.y - from.y) + 'px) scale(1.5)', opacity: 0}],
+    {duration: 320, easing: 'cubic-bezier(.22,.8,.28,1)'});
+  a.onfinish = a.oncancel = function(){ g.remove(); };
+}
+function cpuView(sn, run, instant){
+  setWobble(S.playing && run >= 0);
+  if (run >= 0){
+    morphTo(radii(LOBES[run], .07), hex(COL[run]));
+    $('cBig').style.color = INK[run]; $('cSub').style.color = INK[run];
+  } else {
+    morphTo(radii(0, 0), hex('#E2E7DC'));
+    $('cBig').style.color = '#18181B'; $('cSub').style.color = '#4E5259';
+  }
+}
+function cpuText(sn, k){
+  var run = sn.run, dots = $('dots');
+  if (run >= 0){
+    var b = S.procs[run].burst, left = sn.rem[run];
+    $('cBig').textContent = S.procs[run].id;
+    $('cSub').textContent = left + ' of ' + b + ' left';
+    if (dots.childNodes.length !== b || dots.dataset.pid !== String(run)){ dots.replaceChildren(); dots.dataset.pid = run; for (var j = 0; j < b; j++) dots.appendChild(h('i')); }
+    for (var q = 0; q < b; q++) dots.childNodes[q].className = q < b - left ? 'f' : '';
+    $('cookieSvg').setAttribute('aria-label', 'CPU running task ' + S.procs[run].id + ', ' + left + ' ticks left');
+  } else {
+    $('cBig').textContent = '—';
+    $('cSub').textContent = k >= S.sim.total ? 'all done' : 'idle';
+    dots.replaceChildren(); dots.dataset.pid = '';
+    $('cookieSvg').setAttribute('aria-label', 'CPU idle');
+  }
+  $('live').textContent = (run >= 0 ? S.procs[run].id + ' running, ' : 'CPU idle, ') + sn.ready.length + ' waiting, ' + sn.done.length + ' done';
+}
+
+/* ---------- clock ---------- */
+var last = 0, raf = 0;
+function setPlaying(on){
+  S.playing = on;
+  setWobble(on && S.run >= 0);
+  $('play').textContent = on ? 'Pause' : 'Play';
+  cancelAnimationFrame(raf);
+  if (on){ last = 0; raf = requestAnimationFrame(frame); }
+}
+function frame(ts){
+  if (!S.playing) return;
+  if (!last) last = ts;
+  var dt = (ts - last) / 1000; last = ts;
+  S.t = Math.min(S.sim.total, S.t + dt * 2 * S.speed);
+  paint();
+  if (S.t >= S.sim.total){ setPlaying(false); return; }
+  raf = requestAnimationFrame(frame);
+}
+function paint(instant){ updateGantt(); render(instant); }
+function seek(t, instant){ S.t = Math.max(0, Math.min(S.sim.total, t)); paint(instant); }
+function stepBy(d){ setPlaying(false); seek(Math.round(S.t + 1e-6) + d); }
+$('play').addEventListener('click', function(){
+  if (!S.playing && S.t >= S.sim.total) seek(0, true);
+  setPlaying(!S.playing);
+});
+$('back').addEventListener('click', function(){ stepBy(-1); });
+$('fwd').addEventListener('click', function(){ stepBy(1); });
+$('scrub').addEventListener('input', function(){ setPlaying(false); seek(+this.value, false); });
+Array.prototype.forEach.call($('speed').children, function(b){
+  b.addEventListener('click', function(){
+    S.speed = +b.dataset.s;
+    Array.prototype.forEach.call($('speed').children, function(x){ x.classList.toggle('on', x === b); });
+  });
+});
+document.addEventListener('keydown', function(e){
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); undo(); return; }
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+  if (e.target.tagName === 'BUTTON' && e.code === 'Space') return;
+  if (e.code === 'Space'){ e.preventDefault(); $('play').click(); }
+  else if (e.code === 'ArrowRight'){ e.preventDefault(); stepBy(e.shiftKey ? 5 : 1); }
+  else if (e.code === 'ArrowLeft'){ e.preventDefault(); stepBy(e.shiftKey ? -5 : -1); }
+  else if (/^[1-5]$/.test(e.key) && S.algo !== ALGOS[+e.key - 1]){ pushUndo(); S.algo = ALGOS[+e.key - 1]; say(''); buildAll(); }
+});
+
+/* ---------- views ---------- */
+Array.prototype.forEach.call($('viewTabs').children, function(b){
+  b.addEventListener('click', function(){
+    S.view = b.dataset.view;
+    Array.prototype.forEach.call($('viewTabs').children, function(x){ x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
+    var cmpOn = S.view === 'cmp';
+    $('simView').hidden = $('metricsView').hidden = cmpOn;
+    $('cmpView').hidden = !cmpOn;
+    if (cmpOn){ setPlaying(false); buildCompare(); } else { S.sig = ''; paint(true); }
+  });
+});
+
+function recompute(){
+  S.sim = simulate(S.procs, S.algo, S.quantum, S.preempt);
+  S.t = Math.min(S.t, S.sim.total);
+  buildGantt(); buildMetrics();
+  S.sig = ''; S.run = -2;
+  Object.keys(tokens).forEach(function(i){ if (+i >= S.procs.length){ tokens[i].remove(); delete tokens[i]; } });
+  paint(true);
+  if (S.view === 'cmp') buildCompare();
+}
+function buildAll(){ buildTabs(); buildWorkload(); recompute(); }
+
+buildAll();
+window.__sched = S;
+})();
+</script>
+</body>
+</html>

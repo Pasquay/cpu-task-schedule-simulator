@@ -94,8 +94,23 @@ select.num{-webkit-appearance:none;appearance:none;cursor:pointer;font:600 15px 
 .tip span{color:var(--on-dark)}
 .mhead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .exl{align-self:center;padding:0 8px 0 14px}
-#exportRow .tab,#cmpExport .tab{height:40px;padding:0 16px;font-size:14px}
-.edge{display:flex;flex-direction:column;gap:6px}
+.hright{display:flex;align-items:center;gap:12px}
+/* Export: one button with a small menu */
+.xmenu{position:relative}
+.xbtn{height:52px;padding:0 20px 0 22px;border:0;border-radius:999px;background:var(--surface);font:600 15px var(--text);color:var(--ink);display:flex;align-items:center;gap:10px;box-shadow:inset 0 0 0 2px var(--tray);transition:background .2s var(--ease)}
+.xbtn:hover,.xbtn[aria-expanded="true"]{background:#F7F9F5}
+.xbtn svg{transition:transform .2s var(--ease)}
+.xbtn[aria-expanded="true"] svg{transform:rotate(180deg)}
+.xlist{position:absolute;right:0;top:calc(100% + 8px);z-index:70;background:var(--surface);border-radius:22px;padding:8px;box-shadow:0 12px 32px #18181B26;min-width:230px;display:flex;flex-direction:column;gap:2px}
+.xlist .xh{padding:6px 14px 8px;font:600 12px var(--text);color:var(--muted)}
+.xlist button{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:11px 14px;border:0;background:transparent;border-radius:14px;font:600 15px var(--text);text-align:left}
+.xlist button:hover,.xlist button:focus-visible{background:var(--ground)}
+.xlist small{font:400 12px var(--mono);color:var(--muted)}
+#algoTabs .tab{padding:0 15px}
+@media (max-width:1320px){#algoTabs .tab{padding:0 11px;font-size:14px}#viewTabs .tab{padding:0 14px}}
+.edge{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.ewhy{margin:0;padding:12px 18px;border-radius:18px;background:var(--ground);font:400 14px/1.5 var(--text);color:var(--ink)}
+.ewhy b{font-weight:600}
 .edge button{display:flex;align-items:center;gap:10px;height:40px;padding:0 16px 0 6px;border:0;border-radius:999px;background:var(--tray);font:600 14px var(--text);text-align:left;transition:background .2s var(--ease),color .2s var(--ease)}
 .edge button:hover:not(.on){background:#D6DCCE}
 .edge button .n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--surface);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font:600 13px var(--mono)}
@@ -192,9 +207,22 @@ td.aname small{display:block;margin-top:2px}
 
 <header>
   <nav class="seg" id="algoTabs" aria-label="Scheduling algorithm"></nav>
-  <div class="seg" id="viewTabs" role="group" aria-label="View">
-    <button class="tab on" data-view="sim" aria-pressed="true">Simulator</button>
-    <button class="tab" data-view="cmp" aria-pressed="false">Compare</button>
+  <div class="hright">
+    <div class="xmenu">
+      <button class="xbtn" id="exportBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="exportList">Export
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="xlist" id="exportList" role="menu" hidden>
+        <span class="xh" id="exportHead">This simulation</span>
+        <button role="menuitem" data-x="csv">CSV <small>spreadsheet</small></button>
+        <button role="menuitem" data-x="png">PNG <small>image</small></button>
+        <button role="menuitem" data-x="pdf">PDF <small>printable page</small></button>
+      </div>
+    </div>
+    <div class="seg" id="viewTabs" role="group" aria-label="View">
+      <button class="tab on" data-view="sim" aria-pressed="true">Simulator</button>
+      <button class="tab" data-view="cmp" aria-pressed="false">Compare</button>
+    </div>
   </div>
 </header>
 
@@ -234,8 +262,6 @@ td.aname small{display:block;margin-top:2px}
       <button class="tab fill" id="undo" disabled>Undo</button>
       <button class="tab fill" id="reset">Reset</button>
     </div>
-    <span class="lbl">Edge cases</span>
-    <div class="edge" id="edgeList" role="group" aria-label="Edge case examples"></div>
   </aside>
 
   <section class="main">
@@ -285,19 +311,17 @@ td.aname small{display:block;margin-top:2px}
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:baseline;gap:16px"><h3>Edge cases</h3><span class="ctx">click one to load its workload and algorithm</span></div>
+      <div class="edge" id="edgeList" role="group" aria-label="Edge case examples"></div>
+      <p class="ewhy" id="edgeWhy" role="status" aria-live="polite" hidden></p>
+    </div>
   </section>
 </div>
 
 <section id="metricsView" class="mview">
-  <div class="mhead">
-    <h2>Metrics</h2>
-    <div class="seg" id="exportRow" role="group" aria-label="Export results">
-      <span class="lbl exl">Export</span>
-      <button class="tab" data-x="csv">CSV</button>
-      <button class="tab" data-x="png">PNG</button>
-      <button class="tab" data-x="pdf">PDF</button>
-    </div>
-  </div>
+  <h2>Metrics</h2>
   <div class="mrow">
     <div class="dark" id="dark"></div>
     <div class="tcard"><table id="mtable"></table></div>
@@ -308,12 +332,6 @@ td.aname small{display:block;margin-top:2px}
   <div class="card">
     <div class="mhead">
       <div style="display:flex;align-items:baseline;gap:16px"><h3>Compare</h3><span class="ctx" id="cmpCtx"></span></div>
-      <div class="seg" id="cmpExport" role="group" aria-label="Export comparison">
-        <span class="lbl exl">Export</span>
-        <button class="tab" data-x="csv">CSV</button>
-        <button class="tab" data-x="png">PNG</button>
-        <button class="tab" data-x="pdf">PDF</button>
-      </div>
     </div>
     <div class="axis"><div class="sp"></div><div class="ruler" id="cRuler"></div></div>
     <div id="strips"></div>
@@ -363,6 +381,10 @@ function simulate(procs, algo, quantum, preemptive, mlq){
   function key(j){
     if (algo === 'SJF' && preemptive === false) return [burst[j], arrival[j], j];
     if (algo === 'SRTF' || (algo === 'SJF' && preemptive !== false)) return [rem[j], arrival[j], j];
+    /* LRTF: longest remaining time first (negated so the smallest key wins); non-preemptive = LJF, by burst */
+    /* LIFO: newest arrival first; among equal arrivals the task added later counts as newer */
+    if (algo === 'LIFO') return [-arrival[j], -j];
+    if (algo === 'LRTF') return preemptive === false ? [-burst[j], arrival[j], j] : [-rem[j], arrival[j], j];
     if (algo === 'Priority') return [pri[j], arrival[j], j];
     /* HRRN: response ratio = (waiting + burst) / burst, highest first (negated so the smallest key wins) */
     if (algo === 'HRRN') return [-((t - arrival[j] + burst[j]) / burst[j]), arrival[j], j];
@@ -397,7 +419,7 @@ function simulate(procs, algo, quantum, preemptive, mlq){
       list = cands(); list.sort(function(a, b){ return cmp(key(a), key(b)); }); if (list.length) next = list[0];
     }
     /* preemptive SJF/SRTF/Priority: on a tie in remaining time or priority, the running task keeps the CPU */
-    if ((algo === 'SJF' || algo === 'SRTF' || algo === 'Priority') && preemptive !== false && cur !== -1 && next !== cur && key(cur)[0] === key(next)[0]) next = cur;
+    if ((algo === 'SJF' || algo === 'SRTF' || algo === 'LRTF' || algo === 'Priority') && preemptive !== false && cur !== -1 && next !== cur && key(cur)[0] === key(next)[0]) next = cur;
     var ready;
     if (algo === 'RR') ready = queue.slice();
     else if (isMLQ){
@@ -478,7 +500,7 @@ function simulate(procs, algo, quantum, preemptive, mlq){
 <script>
 (function(){
 'use strict';
-var ALGOS = ['FCFS','SJF','SRTF','RR','Priority','HRRN','MLQ','MLFQ'];
+var ALGOS = ['FCFS','LIFO','SJF','SRTF','LRTF','RR','Priority','HRRN','MLQ','MLFQ'];
 var MLQ_ALGOS = ['FCFS', 'SJF', 'RR', 'Priority'];
 function defaultMlq(){ return {n: 2, algos: ['RR', 'FCFS', 'SJF'], q: [2, 4, 8]}; }
 function copyMlq(m){ return {n: m.n, algos: m.algos.slice(), q: m.q.slice()}; }
@@ -509,12 +531,16 @@ var PRESETS = [
    why: 'nothing has arrived during 0\u20132 and 7\u20139, so the CPU sits idle.'},
   {name: 'Arrival tie', algo: 'FCFS', rows: [[0,4,1],[0,2,1],[0,3,1]],
    why: 'A, B and C all arrive at t = 0, so they run in task order: A, B, C.'},
+  {name: 'LIFO order', algo: 'LIFO', preempt: false, rows: [[0,3,1],[1,2,1],[2,2,1],[2,1,1]],
+   why: 'A runs first (it is alone). At t = 3 the newest arrivals are C and D (both t = 2); D was added after C, so D goes first, then C. B, the oldest waiter, goes last.'},
   {name: 'Burst tie', algo: 'SJF', preempt: false, rows: [[0,3,1],[2,2,1],[1,2,1],[1,2,1]],
    why: 'B, C and D all have burst 2. Earlier arrival wins (C, D before B), then task order (C before D).'},
   {name: 'Priority tie', algo: 'Priority', preempt: false, rows: [[0,4,3],[1,3,1],[2,2,1],[1,1,2]],
    why: 'lower number = higher priority. B and C share priority 1, so earlier arrival (B) goes first.'},
   {name: 'SRTF tie', algo: 'SRTF', preempt: true, rows: [[0,5,1],[2,3,1],[4,1,1]],
    why: 'B arrives at t = 2 needing 3, the same as A has left, so A keeps the CPU. Same when C arrives at t = 4.'},
+  {name: 'LRTF tie', algo: 'LRTF', preempt: true, rows: [[0,3,1],[1,4,1],[2,2,1]],
+   why: 'the task with the most time left runs. On a tie the running task keeps the CPU (B at t = 3, C at t = 6); otherwise earlier arrival wins (A at t = 4).'},
   {name: 'HRRN ratio', algo: 'HRRN', rows: [[0,3,1],[1,6,1],[2,4,1]],
    why: 'at t = 3, B\u2019s ratio is (2 + 6) / 6 = 1.33 and C\u2019s is (1 + 4) / 4 = 1.25, so B runs first even though C is shorter.'},
   {name: 'MLQ preemption', algo: 'MLQ', preempt: true, mlq: {n: 2, algos: ['RR', 'FCFS', 'SJF'], q: [2, 4, 8]}, rows: [[0,5,1,2],[2,3,1,1],[3,2,1,1]],
@@ -524,8 +550,8 @@ var PRESETS = [
 ];
 function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arrival: r[0], burst: r[1], priority: r[2], queue: r[3] || 1 + (i % 2)}; }); }
 
-var FULL = {FCFS: 'First Come First Serve', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling', HRRN: 'Highest Response Ratio Next', MLQ: 'Multilevel Queue', MLFQ: 'Multilevel Feedback Queue'};
-function defaultPre(){ return {FCFS: false, SJF: false, SRTF: true, RR: true, Priority: true, HRRN: false, MLQ: true, MLFQ: true}; }
+var FULL = {FCFS: 'First Come First Serve', LIFO: 'Last In First Out', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', LRTF: 'Longest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling', HRRN: 'Highest Response Ratio Next', MLQ: 'Multilevel Queue', MLFQ: 'Multilevel Feedback Queue'};
+function defaultPre(){ return {FCFS: false, LIFO: false, SJF: false, SRTF: true, LRTF: true, RR: true, Priority: true, HRRN: false, MLQ: true, MLFQ: true}; }
 var S = {algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), mlq: defaultMlq(), mlfq: defaultMlfq(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
 
 function $(id){ return document.getElementById(id); }
@@ -788,7 +814,8 @@ function loadEdge(k){
   if (p.mlq) S.mlq = copyMlq(p.mlq);
   if (p.mlfq) S.mlfq = copyMlfq(p.mlfq);
   S.t = 0; buildAll();
-  say('Edge case ' + (k + 1) + ', ' + p.name + ' (' + p.algo + (p.preempt === false ? ', non-preemptive' : '') + '): ' + p.why, true);
+  say('');
+  var w = $('edgeWhy'); w.replaceChildren(h('b', null, (k + 1) + '. ' + p.name + ' \u00b7 ' + p.algo + (p.preempt === false ? ' (non-preemptive)' : p.preempt ? ' (preemptive)' : '') + ': '), p.why);
 }
 PRESETS.forEach(function(p, k){
   $('edgeList').appendChild(h('button', {'data-k': k, 'aria-pressed': 'false', onclick: function(){ loadEdge(k); }},
@@ -799,6 +826,7 @@ function markEdge(){
     var on = +b.dataset.k === S.preset;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   });
+  $('edgeWhy').hidden = S.preset < 0; /* explanation only while the example is untouched */
 }
 $('reset').addEventListener('click', function(){
   pushUndo(); S.procs = mk(DEFAULT); S.algo = 'SRTF'; S.quantum = 2; S.pre = defaultPre(); S.mlq = defaultMlq(); S.mlfq = defaultMlfq(); S.preset = -1; say(''); buildAll();
@@ -885,13 +913,13 @@ function buildMetrics(){
 function compareRuns(){
   var v = [];
   ALGOS.forEach(function(a){
-    if (a === 'SJF' || a === 'Priority'){ v.push([a, false]); v.push([a, true]); }
-    else if (a === 'SRTF'){ v.push([a, true]); v.push([a, false]); }
+    if (a === 'SJF' || a === 'LIFO' || a === 'Priority'){ v.push([a, false]); v.push([a, true]); }
+    else if (a === 'SRTF' || a === 'LRTF'){ v.push([a, true]); v.push([a, false]); }
     else if (isML(a)){ v.push([a, true]); v.push([a, false]); }
     else v.push([a, a === 'RR']);
   });
   return v.map(function(x){
-    var a = x[0], pre = x[1], both = a === 'SJF' || a === 'SRTF' || a === 'Priority' || isML(a);
+    var a = x[0], pre = x[1], both = a === 'SJF' || a === 'LIFO' || a === 'SRTF' || a === 'LRTF' || a === 'Priority' || isML(a);
     var mode = both ? (pre ? 'preemptive' : 'non-preemptive') : a === 'RR' ? 'quantum ' + S.quantum : 'non-preemptive';
     return {a: a, pre: pre, mode: mode, s: simulate(S.procs, a, S.quantum, pre, cfgFor(a))};
   });
@@ -1191,7 +1219,7 @@ document.addEventListener('keydown', function(e){
   if (e.code === 'Space'){ e.preventDefault(); $('play').click(); }
   else if (e.code === 'ArrowRight'){ e.preventDefault(); stepBy(e.shiftKey ? 5 : 1); }
   else if (e.code === 'ArrowLeft'){ e.preventDefault(); stepBy(e.shiftKey ? -5 : -1); }
-  else if (/^[1-8]$/.test(e.key) && S.algo !== ALGOS[+e.key - 1]){ pushUndo(); S.algo = ALGOS[+e.key - 1]; say(''); buildAll(); }
+  else if (/^[0-9]$/.test(e.key) && S.algo !== ALGOS[(+e.key + 9) % 10]){ pushUndo(); S.algo = ALGOS[(+e.key + 9) % 10]; say(''); buildAll(); } /* 1-9, then 0 = 10th tab */
 });
 
 /* ---------- views ---------- */
@@ -1520,12 +1548,17 @@ function exportAs(kind, scope){
     if (!cmp) say('Exported ' + name, true);
   });
 }
-Array.prototype.forEach.call(document.querySelectorAll('#exportRow [data-x]'), function(b){
-  b.addEventListener('click', function(){ exportAs(b.dataset.x); });
+/* one Export menu in the header: exports whichever page is showing */
+function setExportMenu(open){
+  $('exportList').hidden = !open; $('exportBtn').setAttribute('aria-expanded', open);
+  if (open){ $('exportHead').textContent = S.view === 'cmp' ? 'This comparison' : 'This simulation (' + S.algo + ')'; $('exportList').querySelector('button').focus(); }
+}
+$('exportBtn').addEventListener('click', function(e){ e.stopPropagation(); setExportMenu($('exportList').hidden); });
+Array.prototype.forEach.call(document.querySelectorAll('#exportList [data-x]'), function(b){
+  b.addEventListener('click', function(){ setExportMenu(false); exportAs(b.dataset.x, S.view === 'cmp' ? 'cmp' : null); });
 });
-Array.prototype.forEach.call(document.querySelectorAll('#cmpExport [data-x]'), function(b){
-  b.addEventListener('click', function(){ exportAs(b.dataset.x, 'cmp'); });
-});
+document.addEventListener('click', function(e){ if (!$('exportList').hidden && !e.target.closest('.xmenu')) setExportMenu(false); });
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !$('exportList').hidden){ setExportMenu(false); $('exportBtn').focus(); } });
 
 function recompute(){
   S.sim = simulate(S.procs, S.algo, S.quantum, S.preempt, cfgFor(S.algo));

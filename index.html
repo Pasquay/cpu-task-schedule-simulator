@@ -44,7 +44,26 @@ header{display:flex;align-items:center;justify-content:space-between;flex-wrap:w
 .tab:disabled{opacity:.45;cursor:default}
 
 .row{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}
-aside{flex:1 1 260px;max-width:280px;display:flex;flex-direction:column;gap:20px}
+aside{flex:none;width:280px;display:flex;flex-direction:column;gap:14px}
+/* simulator layout: band 1 = workload next to the stage; everything after spans the full width */
+.simgrid{display:flex;flex-direction:column;gap:28px}
+.band{display:flex;gap:40px;align-items:stretch}
+.band .stage{flex:1;min-width:0;display:flex;flex-direction:column}
+.band .zones{margin-top:auto;margin-bottom:auto;padding-top:28px}
+/* compact workload table */
+aside .stepper .round{width:36px;height:36px}
+aside .count{font-size:16px}
+.wl{gap:7px 8px}
+.wl .num{height:36px;border-radius:12px;font-size:15px}
+.wl .token{padding:7px 0}
+/* algorithm settings under the stage title */
+.shead{display:flex;flex-direction:column;gap:14px;min-width:0}
+.scfg{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;max-width:calc(100% - 20px)}
+.scfg .seg{padding:3px}
+.scfg .seg .tab{height:36px;padding:0 14px;font-size:13px;white-space:nowrap;flex:none}
+.scfg .quantum{gap:8px}
+.scfg .num{width:56px;height:36px;border-radius:12px;font-size:15px}
+.scfg .lbl{font-size:13px}
 h2{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em}
 h3{margin:0;font-size:22px;font-weight:800}
 .lbl{font:600 13px var(--text);color:var(--muted)}
@@ -66,7 +85,8 @@ h3{margin:0;font-size:22px;font-weight:800}
 .pre .tab{flex:1;height:40px;padding:0 8px;font-size:13px}
 .quantum{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .quantum .num{width:84px}
-.note{min-height:20px;font-size:13px;color:var(--error)}
+.note{font-size:13px;color:var(--error)}
+.note:empty{display:none}
 .note.info{color:var(--muted)}
 .algoname{font-weight:600;color:var(--muted)}
 .mlq{display:flex;flex-direction:column;gap:10px}
@@ -80,14 +100,19 @@ select.num{-webkit-appearance:none;appearance:none;cursor:pointer;font:600 15px 
 .cbar,.bar,#readyZone .token,#done .token{cursor:help}
 .qlanes{width:100%;display:flex;flex-direction:column;gap:10px}
 .qlane{display:flex;flex-direction:column;gap:4px;transition:opacity .2s var(--ease)}
-.qlane .qh{display:flex;justify-content:space-between;align-items:baseline;padding:0 14px;font:600 13px var(--text);color:var(--muted)}
+.qlane .qh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 6px 0 14px;font:600 13px var(--text);color:var(--muted)}
+.qh .ctl{display:flex;gap:6px;align-items:center;font:400 12px var(--mono)}
+.qh .num{height:30px;border-radius:10px;font-size:13px}
+.qh select.num{width:92px;padding:0 8px}
+.qh input.num{width:42px}
+.qh .fixed{display:inline-flex;align-items:center;justify-content:center;width:92px;height:30px;border-radius:10px;background:var(--tray);font:600 13px var(--text);color:var(--ink)}
 .qlane .qh small{font:400 12px var(--mono)}
 .qtray{min-height:58px;background:var(--tray);border-radius:30px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;position:relative;border:3px solid transparent;transition:border-color .2s var(--ease)}
 .qtray .token{padding:8px 14px;font-size:14px}
 .qtray .hint{position:static;margin:0 auto}
 .qlane.on .qtray{border-color:var(--ink)}
 .qlane.on .qh{color:var(--ink)}
-.qlane.blocked{opacity:.4}
+.qlane.blocked .qtray{opacity:.4}
 .cookie .qsub{font:400 12px var(--mono);opacity:.85}
 .tip{position:fixed;z-index:60;pointer-events:none;background:var(--charcoal);color:#fff;border-radius:14px;padding:10px 14px;font:400 13px/1.5 var(--mono);white-space:pre;box-shadow:0 6px 20px #0003}
 .tip b{font:600 14px var(--text);display:block;margin-bottom:2px}
@@ -123,7 +148,8 @@ select.num{-webkit-appearance:none;appearance:none;cursor:pointer;font:600 15px 
 .bar.idle>div{overflow:hidden;font-size:12px;color:var(--muted);background:repeating-linear-gradient(135deg,#F1F4EE 0 5px,#E2E7DC 5px 10px)}
 .cbar.idle{border:2px dashed #C9CFC1;color:var(--muted);background:repeating-linear-gradient(135deg,#F1F4EE 0 5px,#E2E7DC 5px 10px)}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
-.btns .tab{height:44px;padding:0 10px;min-width:calc(50% - 4px)}
+.btns{flex-wrap:nowrap}
+.btns .tab{height:38px;padding:0 8px;font-size:14px;min-width:0}
 
 .main{flex:999 1 640px;min-width:0;display:flex;flex-direction:column;gap:28px}
 .stage{position:relative;overflow:hidden;background:var(--surface);border-radius:56px 40px 64px 44px;padding:32px 40px 36px}
@@ -184,6 +210,10 @@ select.num{-webkit-appearance:none;appearance:none;cursor:pointer;font:600 15px 
 .tcard{flex:1;min-width:0;overflow-x:auto;background:var(--surface);border-radius:40px;padding:24px 28px}
 table{width:100%;border-collapse:collapse}
 th{font:600 13px var(--text);color:var(--muted);text-align:right;padding:0 12px 12px 0;white-space:nowrap}
+.sortb{border:0;background:none;padding:4px 0;font:inherit;color:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.sortb:hover{color:var(--ink)}
+.sortb .arr{display:inline-block;width:10px;text-align:center;font:600 12px var(--mono)}
+th[aria-sort="ascending"] .sortb,th[aria-sort="descending"] .sortb{color:var(--ink)}
 td{font:400 16px var(--mono);text-align:right;padding:14px 12px 14px 0;border-top:1px solid var(--rule-2);font-variant-numeric:tabular-nums}
 th:first-child,td:first-child{text-align:left}
 td .token{padding:6px 14px}
@@ -226,52 +256,52 @@ td.aname small{display:block;margin-top:2px}
   </div>
 </header>
 
-<div class="row" id="simView">
+<div class="simgrid" id="simView">
+  <div class="band">
   <aside>
     <h2>Workload</h2>
-    <div class="stepper" role="group" aria-label="Task count">
-      <button class="round" id="minus" aria-label="Remove task">&minus;</button>
-      <span class="count" id="count">5 tasks</span>
-      <button class="round" id="plus" aria-label="Add task">+</button>
-    </div>
-    <div class="wl" id="wl"></div>
-    <div class="quantum" id="qRow" hidden>
-      <label class="lbl" for="quantum">Time quantum</label>
-      <input class="num" id="quantum" type="text" inputmode="numeric" autocomplete="off" value="2">
-    </div>
-    <div class="mlq" id="mlqBox" hidden>
-      <div class="quantum"><span class="lbl">Queues (Q1 = highest)</span>
-        <div class="seg mlqn" id="mlqN" role="group" aria-label="Number of queues"><button class="tab" data-n="2">2</button><button class="tab" data-n="3">3</button></div>
-      </div>
-      <div id="mlqRows" class="mlq"></div>
-    </div>
-    <div class="mlq" id="mlfqBox" hidden>
-      <div class="quantum"><span class="lbl">Queues (all start in Q1)</span>
-        <div class="seg mlqn" id="mlfqN" role="group" aria-label="Number of queues"><button class="tab" data-n="2">2</button><button class="tab" data-n="3">3</button></div>
-      </div>
-      <div id="mlfqRows" class="mlq"></div>
-    </div>
-    <span class="lbl" id="preLbl" hidden>Preemption between queues</span>
-    <div class="seg pre" id="preRow" role="group" aria-label="Preemption" hidden>
-      <button class="tab on" data-p="1" aria-pressed="true">Preemptive</button>
-      <button class="tab" data-p="0" aria-pressed="false">Non-preemptive</button>
-    </div>
-    <div class="note" id="note" role="status" aria-live="polite"></div>
     <div class="btns">
       <button class="tab fill" id="rand">Randomize</button>
       <button class="tab fill" id="undo" disabled>Undo</button>
       <button class="tab fill" id="reset">Reset</button>
     </div>
+    <div class="stepper" role="group" aria-label="Task count">
+      <button class="round" id="minus" aria-label="Remove task">&minus;</button>
+      <span class="count" id="count">5 tasks</span>
+      <button class="round" id="plus" aria-label="Add task">+</button>
+    </div>
+    <div class="note" id="note" role="status" aria-live="polite"></div>
+    <div class="wl" id="wl"></div>
   </aside>
 
-  <section class="main">
     <div class="stage">
       <svg class="grain" aria-hidden="true" viewBox="0 0 400 400" preserveAspectRatio="none">
         <defs><filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/><feColorMatrix in="n" type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.35"/></feComponentTransfer><feComposite in2="SourceGraphic" operator="in"/><feBlend in="SourceGraphic" mode="multiply"/></filter></defs>
         <path id="grainBlob" fill="#2B2B2E" filter="url(#grainF)"/>
       </svg>
       <div class="stagehead">
-        <h2>Stage <span class="algoname" id="algoName"></span></h2>
+        <div class="shead">
+          <h2>Stage <span class="algoname" id="algoName"></span></h2>
+          <div class="scfg" id="stageCfg">
+            <span class="lbl" id="preLbl" hidden>Between queues</span>
+            <div class="seg pre" id="preRow" role="group" aria-label="Preemption" hidden>
+              <button class="tab on" data-p="1" aria-pressed="true">Preemptive</button>
+              <button class="tab" data-p="0" aria-pressed="false">Non-preemptive</button>
+            </div>
+            <div class="quantum" id="qRow" hidden>
+              <label class="lbl" for="quantum">Time quantum</label>
+              <input class="num" id="quantum" type="text" inputmode="numeric" autocomplete="off" value="2">
+            </div>
+            <div class="quantum" id="queueNRow" hidden>
+              <span class="lbl">Queues</span>
+              <div class="seg" id="queueN" role="group" aria-label="Number of queues"><button class="tab" data-n="2">2</button><button class="tab" data-n="3">3</button></div>
+            </div>
+            <div class="quantum" id="agingRow" hidden>
+              <label class="lbl" for="aging">Aging (ticks, 0 = off)</label>
+              <input class="num" id="aging" type="text" inputmode="numeric" autocomplete="off" value="0">
+            </div>
+          </div>
+        </div>
         <div class="tread"><b id="tRead">0</b><span>time t</span></div>
       </div>
       <div class="zones">
@@ -289,35 +319,36 @@ td.aname small{display:block;margin-top:2px}
       <div class="lbl" id="live" role="status" aria-live="polite" style="position:absolute;left:-9999px">&nbsp;</div>
     </div>
 
-    <div class="card">
-      <h3>Timetable</h3>
-      <div class="tt">
-        <div class="names" id="names"></div>
-        <div class="plot" id="plot">
-          <div class="ruler" id="ruler"></div>
-          <div id="lanes"></div>
-          <div class="ph" id="ph"><span id="phLbl">t = 0</span></div>
-        </div>
-      </div>
-      <div class="transport">
-        <button class="tab play" id="play">Play</button>
-        <button class="round" id="back" aria-label="Step back one tick">&minus;1</button>
-        <button class="round" id="fwd" aria-label="Step forward one tick">+1</button>
-        <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" aria-label="Scrub time">
-        <div class="speed" id="speed" role="group" aria-label="Speed">
-          <button class="tab" data-s="0.5">0.5&times;</button>
-          <button class="tab on" data-s="1">1&times;</button>
-          <button class="tab" data-s="2">2&times;</button>
-        </div>
-      </div>
-    </div>
+  </div>
 
-    <div class="card">
-      <div style="display:flex;align-items:baseline;gap:16px"><h3>Edge cases</h3><span class="ctx">click one to load its workload and algorithm</span></div>
-      <div class="edge" id="edgeList" role="group" aria-label="Edge case examples"></div>
-      <p class="ewhy" id="edgeWhy" role="status" aria-live="polite" hidden></p>
+  <div class="card">
+    <h3>Timetable</h3>
+    <div class="tt">
+      <div class="names" id="names"></div>
+      <div class="plot" id="plot">
+        <div class="ruler" id="ruler"></div>
+        <div id="lanes"></div>
+        <div class="ph" id="ph"><span id="phLbl">t = 0</span></div>
+      </div>
     </div>
-  </section>
+    <div class="transport">
+      <button class="tab play" id="play">Play</button>
+      <button class="round" id="back" aria-label="Step back one tick">&minus;1</button>
+      <button class="round" id="fwd" aria-label="Step forward one tick">+1</button>
+      <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" aria-label="Scrub time">
+      <div class="speed" id="speed" role="group" aria-label="Speed">
+        <button class="tab" data-s="0.5">0.5&times;</button>
+        <button class="tab on" data-s="1">1&times;</button>
+        <button class="tab" data-s="2">2&times;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:baseline;gap:16px"><h3>Edge cases</h3><span class="ctx">click one to load its workload and algorithm</span></div>
+    <div class="edge" id="edgeList" role="group" aria-label="Edge case examples"></div>
+    <p class="ewhy" id="edgeWhy" role="status" aria-live="polite" hidden></p>
+  </div>
 </div>
 
 <section id="metricsView" class="mview">
@@ -552,7 +583,7 @@ function mk(rows){ return rows.map(function(r, i){ return {id: LETTERS[i], arriv
 
 var FULL = {FCFS: 'First Come First Serve', LIFO: 'Last In First Out', SJF: 'Shortest Job First', SRTF: 'Shortest Remaining Time First', LRTF: 'Longest Remaining Time First', RR: 'Round Robin', Priority: 'Priority Scheduling', HRRN: 'Highest Response Ratio Next', MLQ: 'Multilevel Queue', MLFQ: 'Multilevel Feedback Queue'};
 function defaultPre(){ return {FCFS: false, LIFO: false, SJF: false, SRTF: true, LRTF: true, RR: true, Priority: true, HRRN: false, MLQ: true, MLFQ: true}; }
-var S = {algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), mlq: defaultMlq(), mlfq: defaultMlfq(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
+var S = {sortM: {col: 'task', dir: 'desc'}, sortC: {col: 'algo', dir: 'desc'}, algo:'SRTF', quantum:2, preempt:true, pre: defaultPre(), mlq: defaultMlq(), mlfq: defaultMlfq(), procs: mk(DEFAULT), view:'sim', t:0, playing:false, speed:1, sim:null, undo:[], preset:-1, sig:'', run:-2};
 
 function $(id){ return document.getElementById(id); }
 function h(tag, attrs){
@@ -658,48 +689,44 @@ function buildTabs(){
   S.preempt = S.pre[S.algo];
   $('algoName').textContent = '(' + FULL[S.algo] + ')';
   $('preRow').hidden = S.algo === 'FCFS' || S.algo === 'RR' || S.algo === 'HRRN';
-  buildMlq(); buildMlfq();
-  $('preLbl').hidden = !isML(S.algo);
   Array.prototype.forEach.call($('preRow').children, function(b){
     var on = (b.dataset.p === '1') === S.preempt;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   });
   $('qRow').hidden = S.algo !== 'RR';
   $('quantum').value = S.quantum;
+  buildCfg();
 }
-/* MLQ sidebar: number of queues, and each queue's algorithm (+ quantum for RR) */
-function buildMlq(){
-  var box = $('mlqBox'); box.hidden = S.algo !== 'MLQ';
-  if (box.hidden) return;
-  Array.prototype.forEach.call($('mlqN').children, function(b){ var on = +b.dataset.n === S.mlq.n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  var rows = $('mlqRows'); rows.replaceChildren();
-  for (var qi = 0; qi < S.mlq.n; qi++) (function(qi){
-    var sel = h('select', {class: 'num', 'aria-label': 'Algorithm for queue ' + (qi + 1), onchange: function(){
-      pushUndo(); S.mlq.algos[qi] = this.value; say(''); buildAll();
-    }}, MLQ_ALGOS.map(function(a){ var o = h('option', {value: a}, a); if (a === S.mlq.algos[qi]) o.selected = true; return o; }));
-    var qin = S.mlq.algos[qi] === 'RR' ? h('input', {class: 'num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: S.mlq.q[qi], 'aria-label': 'Quantum for queue ' + (qi + 1), title: 'Time quantum',
-      oninput: function(){ markBad(this, false); },
-      onchange: function(){
-        var r = checkNum(this.value, 'Quantum for Q' + (qi + 1), 1, 9);
-        if (r.err){ markBad(this, true); say(r.err + ' Still using ' + S.mlq.q[qi] + '.'); return; }
-        markBad(this, false); this.value = r.v; say('');
-        if (r.v === S.mlq.q[qi]) return;
-        pushUndo(); S.mlq.q[qi] = r.v; recompute();
-      }}) : h('span', {class: 'lbl c'}, '');
-    rows.appendChild(h('div', {class: 'mlqrow'}, h('span', {class: 'lbl'}, 'Q' + (qi + 1), h('small', null, qi === 0 ? 'highest' : qi === S.mlq.n - 1 ? 'lowest' : '')), sel, qin));
-  })(qi);
+/* settings band under the stage title: queue count and aging for MLQ / MLFQ */
+function buildCfg(){
+  var ml = isML(S.algo), fb = S.algo === 'MLFQ', n = fb ? S.mlfq.n : S.mlq.n;
+  $('preLbl').hidden = !ml;
+  $('queueNRow').hidden = !ml;
+  Array.prototype.forEach.call($('queueN').children, function(b){ var on = +b.dataset.n === n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  $('agingRow').hidden = !fb; $('aging').value = S.mlfq.aging;
+  $('stageCfg').hidden = $('preRow').hidden && $('qRow').hidden && !ml;
 }
-Array.prototype.forEach.call($('mlqN').children, function(b){
+Array.prototype.forEach.call($('queueN').children, function(b){
   b.addEventListener('click', function(){
-    var n = +b.dataset.n; if (n === S.mlq.n) return;
-    pushUndo(); S.mlq.n = n;
-    S.procs.forEach(function(p){ if (p.queue > n) p.queue = n; });
+    var n = +b.dataset.n, fb = S.algo === 'MLFQ';
+    if (n === (fb ? S.mlfq.n : S.mlq.n)) return;
+    pushUndo();
+    if (fb) S.mlfq.n = n;
+    else { S.mlq.n = n; S.procs.forEach(function(p){ if (p.queue > n) p.queue = n; }); }
     say(''); buildAll();
   });
 });
-/* MLFQ sidebar: number of queues, quantum per RR queue, last queue FCFS/RR, aging */
+$('aging').addEventListener('input', function(){ markBad(this, false); });
+$('aging').addEventListener('change', function(){
+  var r = checkNum(this.value, 'Aging', 0, 99);
+  if (r.err){ markBad(this, true); say(r.err + ' Still using ' + S.mlfq.aging + '.'); return; }
+  markBad(this, false); this.value = r.v; say('');
+  if (r.v === S.mlfq.aging) return;
+  pushUndo(); S.mlfq.aging = r.v; recompute();
+});
+/* small numeric box used in the queue lane headers */
 function qInput(label, val, lo, hi, set){
-  return h('input', {class: 'num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: val, 'aria-label': label,
+  return h('input', {class: 'num', type: 'text', inputmode: 'numeric', autocomplete: 'off', value: val, 'aria-label': label, title: label,
     oninput: function(){ markBad(this, false); },
     onchange: function(){
       var r = checkNum(this.value, label, lo, hi);
@@ -709,27 +736,22 @@ function qInput(label, val, lo, hi, set){
       pushUndo(); set(r.v); val = r.v; recompute();
     }});
 }
-function buildMlfq(){
-  var box = $('mlfqBox'); box.hidden = S.algo !== 'MLFQ';
-  if (box.hidden) return;
-  Array.prototype.forEach.call($('mlfqN').children, function(b){ var on = +b.dataset.n === S.mlfq.n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  var rows = $('mlfqRows'); rows.replaceChildren();
-  for (var qi = 0; qi < S.mlfq.n; qi++) (function(qi){
-    var last = qi === S.mlfq.n - 1, a = last ? S.mlfq.last : 'RR', algoEl;
-    if (last) algoEl = h('select', {class: 'num', 'aria-label': 'Algorithm for the last queue', onchange: function(){ pushUndo(); S.mlfq.last = this.value; say(''); buildAll(); }},
-      ['FCFS', 'RR'].map(function(x){ var o = h('option', {value: x}, x); if (x === a) o.selected = true; return o; }));
-    else algoEl = h('span', {class: 'num', style: 'display:flex;align-items:center;justify-content:center;font:600 15px var(--text)'}, 'RR');
-    var qin = a === 'RR' ? qInput('Quantum for Q' + (qi + 1), S.mlfq.q[qi], 1, 9, function(v){ S.mlfq.q[qi] = v; }) : h('span');
-    rows.appendChild(h('div', {class: 'mlqrow'}, h('span', {class: 'lbl'}, 'Q' + (qi + 1), h('small', null, qi === 0 ? 'highest' : last ? 'lowest' : '')), algoEl, qin));
-  })(qi);
-  rows.appendChild(h('div', {class: 'quantum'}, h('span', {class: 'lbl'}, 'Aging (ticks, 0 = off)'), qInput('Aging', S.mlfq.aging, 0, 99, function(v){ S.mlfq.aging = v; })));
+/* controls in each queue lane's header: algorithm, plus quantum for RR */
+function laneControls(qi, nq){
+  var fb = S.algo === 'MLFQ', last = qi === nq - 1, a, algoEl;
+  if (fb){
+    a = last ? S.mlfq.last : 'RR';
+    algoEl = last ? h('select', {class: 'num', 'aria-label': 'Algorithm for Q' + (qi + 1), onchange: function(){ pushUndo(); S.mlfq.last = this.value; say(''); buildAll(); }},
+      ['FCFS', 'RR'].map(function(x){ var o = h('option', {value: x}, x); if (x === a) o.selected = true; return o; }))
+      : h('span', {class: 'fixed', title: 'Upper MLFQ queues are always RR: using a full quantum is what moves a task down'}, 'RR');
+  } else {
+    a = S.mlq.algos[qi];
+    algoEl = h('select', {class: 'num', 'aria-label': 'Algorithm for Q' + (qi + 1), onchange: function(){ pushUndo(); S.mlq.algos[qi] = this.value; say(''); buildAll(); }},
+      MLQ_ALGOS.map(function(x){ var o = h('option', {value: x}, x); if (x === a) o.selected = true; return o; }));
+  }
+  var q = fb ? S.mlfq.q : S.mlq.q;
+  return h('div', {class: 'ctl'}, algoEl, a === 'RR' ? ['q', qInput('Quantum for Q' + (qi + 1), q[qi], 1, 9, function(v){ q[qi] = v; })] : null);
 }
-Array.prototype.forEach.call($('mlfqN').children, function(b){
-  b.addEventListener('click', function(){
-    var n = +b.dataset.n; if (n === S.mlfq.n) return;
-    pushUndo(); S.mlfq.n = n; say(''); buildAll();
-  });
-});
 function buildWorkload(){
   var g = $('wl'), mlq = S.algo === 'MLQ', pri = S.algo === 'Priority' || (mlq && mlqUsesPri());
   g.className = 'wl';
@@ -887,6 +909,26 @@ function updateGantt(){
   $('scrub').value = t;
 }
 
+/* ---------- sortable table headers ----------
+   st = {col, dir}. The name column (Task / Algorithm) has two states: 'desc' = default order (arrow down),
+   'asc' = reversed (arrow up). Number columns go ascending on the first click, then toggle. */
+function sortHead(label, col, st, nameCol, redraw){
+  var on = st.col === col, dir = on ? st.dir : null;
+  return h('th', {'aria-sort': on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'},
+    h('button', {class: 'sortb', type: 'button', title: 'Sort by ' + label, onclick: function(){
+      if (on) st.dir = st.dir === 'asc' ? 'desc' : 'asc';
+      else { st.col = col; st.dir = col === nameCol ? 'desc' : 'asc'; }
+      redraw();
+    }}, label, h('span', {class: 'arr', 'aria-hidden': 'true', style: on ? '' : 'visibility:hidden'}, dir === 'asc' ? '\u2191' : '\u2193')));
+}
+/* row order: idx = original positions, val(i) = sort value; ties keep the original order */
+function sortedIdx(n, st, nameCol, val){
+  var idx = []; for (var i = 0; i < n; i++) idx.push(i);
+  if (st.col === nameCol) return st.dir === 'asc' ? idx.reverse() : idx;
+  idx.sort(function(a, b){ var d = val(a) - val(b); return (st.dir === 'asc' ? d : -d) || a - b; });
+  return idx;
+}
+
 /* ---------- metrics ---------- */
 function buildMetrics(){
   var s = S.sim, a = s.avg;
@@ -897,11 +939,17 @@ function buildMetrics(){
   d.appendChild(h('hr'));
   d.appendChild(h('div', null, h('b', {class: 's'}, Math.round(s.util * 100) + '%'), h('span', null, 'CPU busy')));
   d.appendChild(h('div', null, h('b', {class: 's'}, s.switches), h('span', null, 'context switches')));
-  var tb = $('mtable'); tb.replaceChildren();
-  var mq = S.algo === 'MLQ';
-  tb.appendChild(h('thead', null, h('tr', null, ['Task', 'Arrival', 'Burst'].concat(mq ? ['Queue'] : [], ['Finish', 'Turnaround', 'Waiting', 'Response']).map(function(x){ return h('th', null, x); }))));
+  drawMetricsTable();
+}
+function drawMetricsTable(){
+  var s = S.sim, tb = $('mtable'); tb.replaceChildren();
+  var mq = S.algo === 'MLQ', st = S.sortM;
+  var cols = [['task', 'Task'], ['arrival', 'Arrival'], ['burst', 'Burst']].concat(mq ? [['queue', 'Queue']] : [], [['finish', 'Finish'], ['turnaround', 'Turnaround'], ['waiting', 'Waiting'], ['response', 'Response']]);
+  if (!cols.some(function(c){ return c[0] === st.col; })){ st.col = 'task'; st.dir = 'desc'; }
+  tb.appendChild(h('thead', null, h('tr', null, cols.map(function(c){ return sortHead(c[1], c[0], st, 'task', drawMetricsTable); }))));
   var body = h('tbody');
-  s.metrics.forEach(function(m, i){
+  sortedIdx(s.metrics.length, st, 'task', function(i){ return st.col === 'queue' ? S.procs[i].queue : s.metrics[i][st.col]; }).forEach(function(i){
+    var m = s.metrics[i];
     body.appendChild(h('tr', null, h('td', null, h('span', {class: 'token', style: tokenStyle(i)}, m.id)),
       h('td', null, m.arrival), h('td', null, m.burst), mq ? h('td', null, 'Q' + Math.min(S.mlq.n, S.procs[i].queue)) : null, h('td', null, m.finish), h('td', null, m.turnaround), h('td', null, m.waiting), h('td', null, m.response)));
   });
@@ -950,11 +998,16 @@ function buildCompare(){
     strips.appendChild(h('div', {class: 'strip', 'data-ri': ri}, h('div', {class: 'name'}, r.a, h('small', null, r.mode)), lane));
   });
   var best = cmpBest(res);
+  S.cmpRes = res; S.cmpBestV = best;
+  drawCompareTable();
+}
+function drawCompareTable(){
+  var res = S.cmpRes, best = S.cmpBestV, st = S.sortC;
   var tb = $('ctable'); tb.replaceChildren();
-  tb.appendChild(h('thead', null, h('tr', null, h('th', null, 'Algorithm'), CMP_COLS.map(function(c){ return h('th', null, c[1]); }))));
+  tb.appendChild(h('thead', null, h('tr', null, sortHead('Algorithm', 'algo', st, 'algo', drawCompareTable), CMP_COLS.map(function(c){ return sortHead(c[1], c[0], st, 'algo', drawCompareTable); }))));
   var body = h('tbody');
-  S.cmpRes = res;
-  res.forEach(function(r, ri){
+  sortedIdx(res.length, st, 'algo', function(ri){ return cmpVal(res[ri], st.col); }).forEach(function(ri){
+    var r = res[ri];
     body.appendChild(h('tr', {'data-ri': ri}, h('td', {class: 'aname'}, r.a, h('small', null, r.mode)), CMP_COLS.map(function(c){
       var v = cmpVal(r, c[0]);
       return h('td', {class: Math.abs(v - best[c[0]]) < 1e-9 ? 'best' : ''}, cmpText(v, c[0]));
@@ -1140,7 +1193,7 @@ function buildLanes(){
   for (var qi = 0; qi < nq; qi++){
     var a = cfg.algos[qi];
     box.appendChild(h('div', {class: 'qlane', id: 'qlane' + qi},
-      h('div', {class: 'qh'}, h('span', null, 'Q' + (qi + 1) + (qi === 0 ? ' \u00b7 highest' : qi === nq - 1 ? ' \u00b7 lowest' : '')), h('small', null, a + (a === 'RR' ? ' q=' + cfg.q[qi] : ''))),
+      h('div', {class: 'qh'}, h('span', null, 'Q' + (qi + 1) + (qi === 0 ? ' \u00b7 highest' : qi === nq - 1 ? ' \u00b7 lowest' : '')), laneControls(qi, nq)),
       h('div', {class: 'qtray', id: 'qtray' + qi}, h('span', {class: 'hint'}, 'empty'))));
   }
 }
